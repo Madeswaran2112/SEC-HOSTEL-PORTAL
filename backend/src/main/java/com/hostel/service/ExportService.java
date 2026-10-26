@@ -151,7 +151,7 @@ public class ExportService {
             document.close();
             
             return new ByteArrayInputStream(out.toByteArray());
-        } catch (DocumentException e) {
+        } catch (DocumentException | IOException e) {
             throw new RuntimeException("Failed to export data to PDF file: " + e.getMessage());
         }
     }

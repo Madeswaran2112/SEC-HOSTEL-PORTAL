@@ -148,15 +148,15 @@ export const LoginPage: React.FC = () => {
         {/* Top-Right: Motto & Tagline */}
         <div className="hidden sm:flex items-center gap-2.5 text-right drop-shadow-md">
           <div className="w-1 h-9 bg-blue-500 rounded-full" />
-          <div className="text-[10px] sm:text-[11px] font-extrabold tracking-wider text-white leading-tight uppercase">
+          <div className="text-[10px] sm:text-[11px] font-extrabold tracking-wider text-orange-400 leading-tight uppercase">
             <div>A Safe Stay</div>
-            <div className="text-blue-100 font-semibold">A Bright Tomorrow</div>
+            <div className="text-blue-800 font-semibold">A Bright Tomorrow</div>
           </div>
         </div>
       </header>
 
       {/* MAIN CONTENT AREA: Centered on mobile, aligned to the right on desktop */}
-      <main className="relative z-10 flex-1 w-full max-w-7xl mx-auto px-6 sm:px-10 lg:px-16 py-6 sm:py-10 flex items-center justify-end">
+      <main className="relative z-10 flex-1 w-full max-w-7xl mx-auto px-6  sm:px-10 lg:px-16 py-6 sm:py-10 flex items-center justify-end">
         {/* Login Card */}
         <div className="w-full max-w-[420px] my-auto">
           <div className="bg-white/92 backdrop-blur-xl rounded-[32px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.22)] border border-white/80 p-7 sm:p-9 transition duration-300">
@@ -165,10 +165,10 @@ export const LoginPage: React.FC = () => {
               <span className="text-xs font-medium text-slate-500">
                 Welcome to
               </span>
-              <h2 className="text-3xl sm:text-4xl font-black text-blue-600 tracking-tight mt-0.5">
+              <h2 className="text-3xl sm:text-4xl font-black text-gray-600 tracking-tight mt-0.5">
                 SEC HOSTEL
               </h2>
-              <p className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mt-0.5">
+              <p className="text-[11px] font-bold text-orange-700 uppercase tracking-wider mt-0.5">
                 Saveetha Engineering College
               </p>
               <div className="w-8 h-1 bg-blue-600 rounded-full mx-auto my-2.5" />

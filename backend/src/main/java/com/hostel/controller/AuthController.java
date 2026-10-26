@@ -31,8 +31,17 @@ public class AuthController {
     }
 
     @PostMapping("/refresh")
-    public ResponseEntity<ApiResponse<AuthResponse>> refreshToken(@RequestParam String token) {
-        AuthResponse response = authService.refreshToken(token);
+    public ResponseEntity<ApiResponse<AuthResponse>> refreshToken(
+            @RequestParam(required = false) String token,
+            @RequestBody(required = false) java.util.Map<String, String> body) {
+        String refreshToken = token;
+        if ((refreshToken == null || refreshToken.isBlank()) && body != null) {
+            refreshToken = body.getOrDefault("refreshToken", body.get("token"));
+        }
+        if (refreshToken == null || refreshToken.isBlank()) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("Refresh token is required"));
+        }
+        AuthResponse response = authService.refreshToken(refreshToken);
         return ResponseEntity.ok(ApiResponse.success("Token refreshed successfully", response));
     }
 
