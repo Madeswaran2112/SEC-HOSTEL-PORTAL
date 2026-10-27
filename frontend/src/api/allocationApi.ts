@@ -219,14 +219,15 @@ export const waitingPoolApi = {
   },
 
   getAdminWaitlist: async (
-    windowId: string | number,
+    windowId?: string | number,
     hostelType?: string,
     status?: string,
     search?: string,
     page = 0,
     size = 10
   ): Promise<ApiResponse<PagedResponse<WaitingPoolEntry>>> => {
-    let url = `/waiting-pool/admin?windowId=${windowId}&page=${page}&size=${size}`;
+    let url = `/waiting-pool/admin?page=${page}&size=${size}`;
+    if (windowId) url += `&windowId=${windowId}`;
     if (hostelType) url += `&hostelType=${hostelType}`;
     if (status && status !== 'ALL') url += `&status=${status}`;
     if (search) url += `&search=${encodeURIComponent(search)}`;

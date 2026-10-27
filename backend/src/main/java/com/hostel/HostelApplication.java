@@ -2,16 +2,13 @@ package com.hostel;
 
 import com.hostel.entity.AllocationWindow;
 import com.hostel.entity.Hostel;
-import com.hostel.entity.Room;
 import com.hostel.entity.RoomType;
 import com.hostel.entity.User;
 import com.hostel.enums.AllocationWindowStatus;
 import com.hostel.enums.HostelType;
 import com.hostel.enums.Role;
-import com.hostel.enums.RoomStatus;
 import com.hostel.repository.AllocationWindowRepository;
 import com.hostel.repository.HostelRepository;
-import com.hostel.repository.RoomRepository;
 import com.hostel.repository.RoomTypeRepository;
 import com.hostel.repository.UserRepository;
 import org.springframework.boot.CommandLineRunner;
@@ -37,8 +34,7 @@ public class HostelApplication {
             PasswordEncoder passwordEncoder,
             HostelRepository hostelRepository,
             RoomTypeRepository roomTypeRepository,
-            AllocationWindowRepository windowRepository,
-            RoomRepository roomRepository) {
+            AllocationWindowRepository windowRepository) {
         return args -> {
             // Seed Admin Users
             java.util.Optional<User> existingAdmin = userRepository.findByEmailIgnoreCase("admin@hostel.com");
@@ -136,30 +132,6 @@ public class HostelApplication {
                         .phase1Status(com.hostel.enums.PhaseStatus.OPEN)
                         .phase2Status(com.hostel.enums.PhaseStatus.OPEN)
                         .build());
-            }
-
-            // Seed Initial Rooms for Boys & Girls Hostels if empty
-            if (roomRepository.count() == 0) {
-                hostelRepository.findAll().forEach(hostel -> {
-                    List<RoomType> allTypes = roomTypeRepository.findAll();
-                    int roomCount = 1;
-                    for (int floor = 1; floor <= Math.min(hostel.getTotalFloors(), 3); floor++) {
-                        for (RoomType rt : allTypes) {
-                            String prefix = (hostel.getHostelType() == HostelType.BOYS) ? "B" : "G";
-                            String roomNumber = prefix + "-" + floor + "0" + roomCount++;
-                            roomRepository.save(Room.builder()
-                                    .hostel(hostel)
-                                    .roomType(rt)
-                                    .roomNumber(roomNumber)
-                                    .building(hostel.getName() + " Block")
-                                    .floorNumber(floor)
-                                    .status(RoomStatus.AVAILABLE)
-                                    .totalCapacity(rt.getCapacity())
-                                    .occupiedBeds(0)
-                                    .build());
-                        }
-                    }
-                });
             }
         };
     }

@@ -9,3 +9,4 @@ public enum WaitlistStatus {
     CANCELLED,
     ALLOCATED
 }
+

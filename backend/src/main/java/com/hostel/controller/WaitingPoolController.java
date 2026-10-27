@@ -71,7 +71,7 @@ public class WaitingPoolController {
     @GetMapping("/admin")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<PagedResponse<WaitingPoolResponse>>> getAdminWaitlist(
-            @RequestParam Long windowId,
+            @RequestParam(required = false) Long windowId,
             @RequestParam(required = false) HostelType hostelType,
             @RequestParam(required = false) WaitlistStatus status,
             @RequestParam(required = false) String search,

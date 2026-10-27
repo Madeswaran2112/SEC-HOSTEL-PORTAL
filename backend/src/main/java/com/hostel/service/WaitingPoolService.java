@@ -335,6 +335,29 @@ public class WaitingPoolService {
             int page,
             int size) {
 
+        if (windowId == null) {
+            List<AllocationWindow> openWindows = windowRepository.findByStatus(AllocationWindowStatus.OPEN);
+            if (!openWindows.isEmpty()) {
+                windowId = openWindows.get(0).getId();
+            } else {
+                List<AllocationWindow> allWindows = windowRepository.findAll();
+                if (!allWindows.isEmpty()) {
+                    windowId = allWindows.get(0).getId();
+                }
+            }
+        }
+
+        if (windowId == null) {
+            return PagedResponse.<WaitingPoolResponse>builder()
+                    .content(new ArrayList<>())
+                    .page(page)
+                    .size(size)
+                    .totalElements(0)
+                    .totalPages(0)
+                    .last(true)
+                    .build();
+        }
+
         Pageable pageable = PageRequest.of(page, size);
         Page<WaitingPool> entriesPage = (hostelType != null)
                 ? waitingPoolRepository.findByAllocationWindowIdAndHostelTypePreference(windowId, hostelType, pageable)
