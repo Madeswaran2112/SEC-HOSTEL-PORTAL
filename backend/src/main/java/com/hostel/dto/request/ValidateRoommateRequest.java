@@ -14,3 +14,4 @@ public class ValidateRoommateRequest {
     @NotBlank(message = "Register number is required")
     private String registerNumber;
 }
+

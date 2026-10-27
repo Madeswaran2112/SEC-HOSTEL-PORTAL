@@ -26,3 +26,4 @@ public class PhaseTwoBookingResponse {
     private List<AllocationResponse> allocations;
     private LocalDateTime bookedAt;
 }
+

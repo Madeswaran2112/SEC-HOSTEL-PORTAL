@@ -53,9 +53,8 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
               <nav className="hidden md:ml-8 md:flex md:space-x-4">
                 <Link to={studentHome} className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-50">Dashboard</Link>
                 <Link to={`${studentHome}/booking`} className="px-3 py-2 rounded-md text-sm font-semibold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50">Room Booking</Link>
-                <Link to={`${studentHome}/group`} className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-50">My Group</Link>
-                <Link to={`${studentHome}/allocation`} className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-50">Room Allocation</Link>
-                <Link to={`${studentHome}/waiting-pool`} className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-50">Waiting Pool</Link>
+                <Link to={`${studentHome}/allocation`} className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-50">My Allocation</Link>
+                <Link to={`${studentHome}/waiting-pool`} className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-50">Waiting List</Link>
               </nav>
             )}
           </div>

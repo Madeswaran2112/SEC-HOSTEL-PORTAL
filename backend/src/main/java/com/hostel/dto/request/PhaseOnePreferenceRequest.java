@@ -17,3 +17,4 @@ public class PhaseOnePreferenceRequest {
     @NotNull(message = "AC preference is required")
     private Boolean isAc;
 }
+

@@ -1,5 +1,14 @@
 export type PhaseStatus = 'NOT_OPEN' | 'OPEN' | 'CLOSED';
 
+export type WaitlistStatus =
+  | 'WAITING'
+  | 'OFFERED'
+  | 'ACCEPTED'
+  | 'DECLINED'
+  | 'EXPIRED'
+  | 'CANCELLED'
+  | 'ALLOCATED';
+
 export interface Allocation {
   id: string;
   studentId: string;
@@ -27,8 +36,22 @@ export interface AllocationWindow {
   startDate: string;
   endDate: string;
   status: AllocationWindowStatus;
+
+  // Phase 1
   phase1Status?: PhaseStatus;
+  effectivePhase1Status?: PhaseStatus;
+  phase1StartDate?: string;
+  phase1EndDate?: string;
+  phase1Description?: string;
+
+  // Phase 2
   phase2Status?: PhaseStatus;
+  effectivePhase2Status?: PhaseStatus;
+  phase2StartDate?: string;
+  phase2EndDate?: string;
+  phase2Description?: string;
+
+  serverTime?: string;
   createdAt: string;
 }
 
@@ -38,6 +61,15 @@ export interface AllocationWindowRequest {
   semester: string;
   startDate: string;
   endDate: string;
+}
+
+export interface PhaseScheduleRequest {
+  phase: number;
+  academicYear?: string;
+  startDate?: string;
+  endDate?: string;
+  status?: PhaseStatus;
+  description?: string;
 }
 
 export interface ManualAllocationRequest {
@@ -51,15 +83,37 @@ export interface WaitingPoolEntry {
   studentId: string;
   studentName: string;
   registerNumber: string;
-  preferredRoomType: string;
+  department?: string;
+  year?: number;
+  preferredRoomType?: any;
+  isAc?: boolean;
+  groupSize?: number;
+  floorPreference?: string;
+  reason?: string;
   hostelTypePreference: string;
   priority: number;
+  queuePosition?: number;
   joinedAt: string;
+  status: WaitlistStatus | string;
+
+  // Offer details
+  offeredRoomId?: number;
+  offeredRoomNumber?: string;
+  offeredRoomTypeName?: string;
+  offeredRoomBuilding?: string;
+  offeredRoomFloor?: number;
+  offeredAt?: string;
+  offerExpiresAt?: string;
+  adminNotes?: string;
 }
 
 export interface WaitingPoolJoinRequest {
-  allocationWindowId: string;
-  preferredRoomTypeId?: string;
+  allocationWindowId: string | number;
+  preferredRoomTypeId?: string | number;
+  isAc?: boolean;
+  groupSize?: number;
+  floorPreference?: string;
+  reason?: string;
 }
 
 export interface PhaseOnePreferenceRequest {
@@ -116,12 +170,26 @@ export interface PhaseTwoBookingResponse {
 export interface BookingStatusResponse {
   window: AllocationWindow | null;
   phase1Status: PhaseStatus;
+  effectivePhase1Status?: PhaseStatus;
+  phase1StartDate?: string;
+  phase1EndDate?: string;
+  phase1Description?: string;
+
   phase2Status: PhaseStatus;
+  effectivePhase2Status?: PhaseStatus;
+  phase2StartDate?: string;
+  phase2EndDate?: string;
+  phase2Description?: string;
+
+  serverTime?: string;
+
   hasSubmittedPhase1: boolean;
   phase1Preference: PhaseOnePreferenceResponse | null;
   hasBookedPhase2: boolean;
   allocation: Allocation | null;
   roommates: Allocation[];
+
+  waitlistEntry?: WaitingPoolEntry | null;
 }
 
 export enum AllocationStatus {

@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import useAuth from '../../hooks/useAuth';
-import { bookingApi } from '../../api/allocationApi';
+import { bookingApi, waitingPoolApi } from '../../api/allocationApi';
 import { roomTypeApi } from '../../api/roomApi';
 import { studentApi } from '../../api/studentApi';
 import {
   BookingStatusResponse,
   PhaseOnePreferenceResponse,
-  ValidateRoommateResponse
+  ValidateRoommateResponse,
+  WaitingPoolEntry,
+  WaitingPoolJoinRequest
 } from '../../types/allocation';
 import { Room, RoomType } from '../../types/room';
 import { Student } from '../../types/student';
@@ -26,7 +28,13 @@ import {
   MapPin,
   Flame,
   ArrowRight,
-  Info
+  Info,
+  XCircle,
+  ListFilter,
+  Check,
+  AlertTriangle,
+  RotateCcw,
+  Award
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -41,14 +49,16 @@ export const TwoPhaseBookingPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [roomsLoading, setRoomsLoading] = useState<boolean>(false);
 
-  // Active Tab: 'phase1' | 'phase2'
-  const [activeTab, setActiveTab] = useState<'phase1' | 'phase2'>('phase1');
+  // Active Tab: 'phase1' | 'phase2' | 'waitlist'
+  const [activeTab, setActiveTab] = useState<'phase1' | 'phase2' | 'waitlist'>('phase1');
 
   // Phase 1 form state
   const [selectedRoomTypeId, setSelectedRoomTypeId] = useState<number | null>(null);
   const [isAcPreference, setIsAcPreference] = useState<boolean>(false);
   const [submittingPhase1, setSubmittingPhase1] = useState<boolean>(false);
   const [showPhase1ConfirmModal, setShowPhase1ConfirmModal] = useState<boolean>(false);
+  const [showPhase1CancelModal, setShowPhase1CancelModal] = useState<boolean>(false);
+  const [cancellingPhase1, setCancellingPhase1] = useState<boolean>(false);
 
   // Phase 2 state
   const [selectedFloor, setSelectedFloor] = useState<number | ''>('');
@@ -58,6 +68,20 @@ export const TwoPhaseBookingPage: React.FC = () => {
   const [validatingRoommate, setValidatingRoommate] = useState<boolean>(false);
   const [submittingPhase2, setSubmittingPhase2] = useState<boolean>(false);
   const [showPhase2ConfirmModal, setShowPhase2ConfirmModal] = useState<boolean>(false);
+  const [showPhase2CancelModal, setShowPhase2CancelModal] = useState<boolean>(false);
+  const [cancellingPhase2, setCancellingPhase2] = useState<boolean>(false);
+
+  // Waiting list join modal
+  const [showWaitlistModal, setShowWaitlistModal] = useState<boolean>(false);
+  const [waitlistPrefTypeId, setWaitlistPrefTypeId] = useState<number | ''>('');
+  const [waitlistIsAc, setWaitlistIsAc] = useState<boolean>(false);
+  const [waitlistGroupSize, setWaitlistGroupSize] = useState<number>(1);
+  const [waitlistFloor, setWaitlistFloor] = useState<string>('');
+  const [waitlistReason, setWaitlistReason] = useState<string>('Selected room type full');
+  const [submittingWaitlist, setSubmittingWaitlist] = useState<boolean>(false);
+
+  // Offer accept / decline state
+  const [processingOffer, setProcessingOffer] = useState<boolean>(false);
 
   const isGirls = location.pathname.startsWith('/girls') || (student?.gender === 'FEMALE') || (user?.gender === 'FEMALE');
 
@@ -95,17 +119,22 @@ export const TwoPhaseBookingPage: React.FC = () => {
       if (profileRes?.data) setStudent(profileRes.data);
       if (statusRes?.data) {
         setBookingStatus(statusRes.data);
-        if (statusRes.data.hasBookedPhase2) {
+        const st = statusRes.data;
+        const effP2 = st.effectivePhase2Status || st.phase2Status;
+
+        if (st.hasBookedPhase2) {
           setActiveTab('phase2');
-        } else if (statusRes.data.phase2Status === 'OPEN' && statusRes.data.hasSubmittedPhase1) {
+        } else if (st.waitlistEntry && st.waitlistEntry.status === 'OFFERED') {
+          setActiveTab('phase2');
+        } else if (effP2 === 'OPEN' && st.hasSubmittedPhase1) {
           setActiveTab('phase2');
         } else {
           setActiveTab('phase1');
         }
 
-        if (statusRes.data.phase1Preference) {
-          setSelectedRoomTypeId(Number(statusRes.data.phase1Preference.preferredRoomTypeId));
-          setIsAcPreference(statusRes.data.phase1Preference.isAc);
+        if (st.phase1Preference) {
+          setSelectedRoomTypeId(Number(st.phase1Preference.preferredRoomTypeId));
+          setIsAcPreference(st.phase1Preference.isAc);
         }
       }
       if (typesRes?.data) {
@@ -125,10 +154,11 @@ export const TwoPhaseBookingPage: React.FC = () => {
 
   // Fetch Phase 2 Rooms when Phase 2 is active
   useEffect(() => {
-    if (activeTab === 'phase2' && bookingStatus?.phase2Status === 'OPEN' && !bookingStatus.hasBookedPhase2) {
+    const effP2 = bookingStatus?.effectivePhase2Status || bookingStatus?.phase2Status;
+    if (activeTab === 'phase2' && effP2 === 'OPEN' && !bookingStatus?.hasBookedPhase2) {
       fetchPhase2Rooms();
     }
-  }, [activeTab, selectedFloor, bookingStatus?.phase2Status]);
+  }, [activeTab, selectedFloor, bookingStatus?.effectivePhase2Status, bookingStatus?.phase2Status]);
 
   const fetchPhase2Rooms = async () => {
     try {
@@ -146,7 +176,8 @@ export const TwoPhaseBookingPage: React.FC = () => {
   };
 
   const handleSelectRoomType = (type: RoomType) => {
-    if (bookingStatus?.phase1Status !== 'OPEN') {
+    const effP1 = bookingStatus?.effectivePhase1Status || bookingStatus?.phase1Status;
+    if (effP1 !== 'OPEN') {
       toast.error('Phase 1 room type preference is currently closed for editing.');
       return;
     }
@@ -162,7 +193,7 @@ export const TwoPhaseBookingPage: React.FC = () => {
 
     try {
       setSubmittingPhase1(true);
-      const res = await bookingApi.submitPhaseOne({
+      await bookingApi.submitPhaseOne({
         preferredRoomTypeId: selectedRoomTypeId,
         isAc: isAcPreference
       });
@@ -177,6 +208,21 @@ export const TwoPhaseBookingPage: React.FC = () => {
     }
   };
 
+  const handleCancelPhase1Preference = async () => {
+    try {
+      setCancellingPhase1(true);
+      await bookingApi.cancelPhaseOne();
+      toast.success('Phase 1 room preference cancelled successfully');
+      setShowPhase1CancelModal(false);
+      setSelectedRoomTypeId(null);
+      await loadData();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to cancel preference.');
+    } finally {
+      setCancellingPhase1(false);
+    }
+  };
+
   const handleValidateRoommate = async () => {
     if (!roommateInput || !roommateInput.trim()) {
       toast.error('Please enter a roommate register number');
@@ -185,13 +231,11 @@ export const TwoPhaseBookingPage: React.FC = () => {
 
     const reg = roommateInput.trim().toUpperCase();
 
-    // Check if adding self
     if (student?.registerNumber && reg === student.registerNumber.toUpperCase()) {
       toast.error('You cannot add yourself as a roommate');
       return;
     }
 
-    // Check duplicate in list
     if (roommates.some(r => r.registerNumber?.toUpperCase() === reg)) {
       toast.error('Roommate already added to the list');
       return;
@@ -260,6 +304,74 @@ export const TwoPhaseBookingPage: React.FC = () => {
     }
   };
 
+  const handleCancelPhase2Booking = async () => {
+    try {
+      setCancellingPhase2(true);
+      await bookingApi.cancelPhaseTwo();
+      toast.success('Room booking cancelled successfully. The bed has been released and offered to the waiting list.');
+      setShowPhase2CancelModal(false);
+      await loadData();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to cancel booking.');
+    } finally {
+      setCancellingPhase2(false);
+    }
+  };
+
+  const handleJoinWaitingList = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bookingStatus?.window?.id) return;
+
+    try {
+      setSubmittingWaitlist(true);
+      const payload: WaitingPoolJoinRequest = {
+        allocationWindowId: bookingStatus.window.id,
+        preferredRoomTypeId: waitlistPrefTypeId !== '' ? waitlistPrefTypeId : undefined,
+        isAc: waitlistIsAc,
+        groupSize: waitlistGroupSize,
+        floorPreference: waitlistFloor || undefined,
+        reason: waitlistReason
+      };
+      await waitingPoolApi.join(payload);
+      toast.success('Joined the waiting list successfully! We will notify you when a room becomes available.');
+      setShowWaitlistModal(false);
+      await loadData();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to join waiting list');
+    } finally {
+      setSubmittingWaitlist(false);
+    }
+  };
+
+  const handleAcceptOffer = async (poolEntryId: string | number) => {
+    try {
+      setProcessingOffer(true);
+      await waitingPoolApi.acceptOffer(poolEntryId);
+      toast.success('Room offer accepted! Your room booking is confirmed.');
+      await loadData();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to accept room offer');
+    } finally {
+      setProcessingOffer(false);
+    }
+  };
+
+  const handleDeclineOffer = async (poolEntryId: string | number) => {
+    if (!window.confirm('Are you sure you want to decline this room offer? The room will be immediately offered to the next candidate in the queue.')) {
+      return;
+    }
+    try {
+      setProcessingOffer(true);
+      await waitingPoolApi.declineOffer(poolEntryId);
+      toast.success('Room offer declined.');
+      await loadData();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to decline offer');
+    } finally {
+      setProcessingOffer(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="py-20 flex justify-center">
@@ -268,10 +380,11 @@ export const TwoPhaseBookingPage: React.FC = () => {
     );
   }
 
-  const phase1Status = bookingStatus?.phase1Status || 'NOT_OPEN';
-  const phase2Status = bookingStatus?.phase2Status || 'NOT_OPEN';
+  const effPhase1Status = bookingStatus?.effectivePhase1Status || bookingStatus?.phase1Status || 'NOT_OPEN';
+  const effPhase2Status = bookingStatus?.effectivePhase2Status || bookingStatus?.phase2Status || 'NOT_OPEN';
   const hasBooked = bookingStatus?.hasBookedPhase2;
   const myAllocation = bookingStatus?.allocation;
+  const waitlist = bookingStatus?.waitlistEntry;
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-12">
@@ -289,7 +402,7 @@ export const TwoPhaseBookingPage: React.FC = () => {
               Two-Phase Room Booking System
             </h1>
             <p className="text-white/85 text-xs sm:text-sm mt-1 max-w-xl">
-              {theme.portalSub} — Submit your room type preference in Phase 1, then select your exact floor, room number, and roommates in Phase 2.
+              {theme.portalSub} — Submit room type preference in Phase 1, then choose your exact floor, room, and verified roommates in Phase 2.
             </p>
           </div>
 
@@ -298,21 +411,71 @@ export const TwoPhaseBookingPage: React.FC = () => {
             <div className="bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-xl border border-white/20">
               <span className="text-[11px] text-white/70 block uppercase tracking-wider font-semibold">Phase 1: Preference</span>
               <div className="flex items-center gap-1.5 mt-0.5">
-                <span className={`w-2 h-2 rounded-full ${phase1Status === 'OPEN' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
-                <span className="text-sm font-black text-white">{phase1Status}</span>
+                <span className={`w-2 h-2 rounded-full ${effPhase1Status === 'OPEN' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+                <span className="text-sm font-black text-white">{effPhase1Status}</span>
               </div>
             </div>
 
             <div className="bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-xl border border-white/20">
               <span className="text-[11px] text-white/70 block uppercase tracking-wider font-semibold">Phase 2: Room Selection</span>
               <div className="flex items-center gap-1.5 mt-0.5">
-                <span className={`w-2 h-2 rounded-full ${phase2Status === 'OPEN' ? 'bg-emerald-400 animate-pulse' : 'bg-gray-400'}`} />
-                <span className="text-sm font-black text-white">{phase2Status}</span>
+                <span className={`w-2 h-2 rounded-full ${effPhase2Status === 'OPEN' ? 'bg-emerald-400 animate-pulse' : 'bg-gray-400'}`} />
+                <span className="text-sm font-black text-white">{effPhase2Status}</span>
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* ACTIVE ROOM OFFER NOTIFICATION CARD (IF OFFERED FROM WAITLIST) */}
+      {waitlist && waitlist.status === 'OFFERED' && (
+        <div className="p-5 bg-gradient-to-r from-indigo-900 via-indigo-800 to-slate-900 text-white rounded-2xl shadow-lg border-2 border-indigo-300 animate-pulse-subtle">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="p-3 bg-white/10 rounded-xl backdrop-blur-xs font-bold text-emerald-400">
+                <Award className="w-8 h-8" />
+              </div>
+              <div>
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500 text-white inline-block mb-1">
+                  Waitlist Room Promotion Available!
+                </span>
+                <h3 className="text-lg font-black tracking-tight">
+                  Room {waitlist.offeredRoomNumber} ({waitlist.offeredRoomTypeName}) has been offered to you!
+                </h3>
+                <p className="text-xs text-indigo-200 mt-0.5">
+                  Building: <span className="text-white font-bold">{waitlist.offeredRoomBuilding || 'Hostel Block'}</span> &bull; Floor {waitlist.offeredRoomFloor}
+                  {waitlist.offerExpiresAt && (
+                    <span className="ml-2 text-amber-300 font-semibold font-mono">
+                      (Offer expires: {formatDateTime(waitlist.offerExpiresAt)})
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                disabled={processingOffer}
+                onClick={() => handleAcceptOffer(waitlist.id)}
+                className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black rounded-xl shadow-md transition disabled:opacity-50 flex items-center gap-1.5"
+              >
+                <Check className="w-4 h-4" />
+                {processingOffer ? 'Processing...' : 'Accept Room Offer'}
+              </button>
+
+              <button
+                type="button"
+                disabled={processingOffer}
+                onClick={() => handleDeclineOffer(waitlist.id)}
+                className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-xl border border-white/20 transition disabled:opacity-50"
+              >
+                Decline Offer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 2. Navigation Tabs */}
       <div className="flex border-b border-gray-200 bg-white rounded-xl p-1.5 shadow-xs">
@@ -351,6 +514,22 @@ export const TwoPhaseBookingPage: React.FC = () => {
             </span>
           )}
         </button>
+
+        {/* Waiting List Tab indicator if active */}
+        {waitlist && waitlist.status === 'WAITING' && (
+          <button
+            type="button"
+            onClick={() => setActiveTab('waitlist')}
+            className={`py-3 px-4 text-xs sm:text-sm font-bold rounded-lg transition flex items-center justify-center gap-1.5 ${
+              activeTab === 'waitlist'
+                ? 'bg-amber-600 text-white shadow-xs'
+                : 'text-amber-800 bg-amber-50 hover:bg-amber-100'
+            }`}
+          >
+            <ListFilter className="w-4 h-4" />
+            <span>Waiting List (#{waitlist.queuePosition || waitlist.priority})</span>
+          </button>
+        )}
       </div>
 
       {/* ======================================================== */}
@@ -358,19 +537,24 @@ export const TwoPhaseBookingPage: React.FC = () => {
       {/* ======================================================== */}
       {activeTab === 'phase1' && (
         <div className="space-y-6">
-          {/* Status Message */}
+          {/* Phase 1 Status Banner */}
           <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-xs">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-100">
               <div>
-                <h2 className="text-lg font-bold text-gray-900">Phase 1: Standard Room Type Selection</h2>
+                <h2 className="text-lg font-bold text-gray-900">Phase 1: Standard Room Type Preference</h2>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  Choose your room type preference from SEC Hostel options. Submissions can be updated anytime while Phase 1 is OPEN.
+                  Select your preferred hostel room type among the 10 standard categories. You can modify or cancel while Phase 1 is OPEN.
                 </p>
+                {bookingStatus?.phase1StartDate && (
+                  <p className="text-[11px] text-gray-400 font-mono mt-1">
+                    Timeline: {formatDateTime(bookingStatus.phase1StartDate)} &mdash; {formatDateTime(bookingStatus.phase1EndDate)} (Asia/Kolkata)
+                  </p>
+                )}
               </div>
               <span className={`px-3 py-1 text-xs font-black rounded-full border self-start sm:self-auto ${
-                phase1Status === 'OPEN' ? 'bg-emerald-50 text-emerald-700 border-emerald-300' : 'bg-amber-50 text-amber-700 border-amber-300'
+                effPhase1Status === 'OPEN' ? 'bg-emerald-50 text-emerald-700 border-emerald-300' : 'bg-amber-50 text-amber-700 border-amber-300'
               }`}>
-                Phase 1 is {phase1Status}
+                Phase 1 is {effPhase1Status}
               </span>
             </div>
 
@@ -391,8 +575,20 @@ export const TwoPhaseBookingPage: React.FC = () => {
                     </span>
                   </div>
                 </div>
-                <div className="text-xs text-gray-500 sm:text-right">
-                  <span>Submitted on: {formatDateTime(bookingStatus.phase1Preference.submittedAt)}</span>
+
+                <div className="flex items-center gap-2">
+                  {effPhase1Status === 'OPEN' && (
+                    <button
+                      type="button"
+                      onClick={() => setShowPhase1CancelModal(true)}
+                      className="px-3 py-1.5 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200 transition"
+                    >
+                      Cancel Submission
+                    </button>
+                  )}
+                  <span className="text-xs text-gray-400 sm:text-right hidden sm:inline">
+                    Submitted: {formatDateTime(bookingStatus.phase1Preference.submittedAt)}
+                  </span>
                 </div>
               </div>
             )}
@@ -436,7 +632,7 @@ export const TwoPhaseBookingPage: React.FC = () => {
                   <div className="mt-4 pt-2">
                     <button
                       type="button"
-                      disabled={phase1Status !== 'OPEN'}
+                      disabled={effPhase1Status !== 'OPEN'}
                       onClick={(e) => {
                         e.stopPropagation();
                         handleSelectRoomType(rt);
@@ -462,7 +658,7 @@ export const TwoPhaseBookingPage: React.FC = () => {
           </div>
 
           {/* Phase 1 Submit Button */}
-          {phase1Status === 'OPEN' && (
+          {effPhase1Status === 'OPEN' && (
             <div className="bg-white rounded-2xl border border-gray-200 p-6 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xs">
               <div>
                 <h4 className="font-bold text-gray-900 text-sm">Ready to save your choice?</h4>
@@ -496,7 +692,7 @@ export const TwoPhaseBookingPage: React.FC = () => {
           {hasBooked && myAllocation && (
             <div className="bg-white rounded-2xl border border-emerald-200 shadow-md overflow-hidden">
               <div className="bg-gradient-to-r from-emerald-600 to-teal-700 px-6 py-5 text-white">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-xs font-bold">
                       <CheckCircle className="w-7 h-7 text-white" />
@@ -506,13 +702,22 @@ export const TwoPhaseBookingPage: React.FC = () => {
                         SEC Hostel Room Assigned
                       </span>
                       <h2 className="text-xl sm:text-2xl font-black">
-                        Room {myAllocation.roomNumber} — Bed {myAllocation.bedNumber}
+                        Room {myAllocation.roomNumber} — Bed #{myAllocation.bedNumber}
                       </h2>
                     </div>
                   </div>
-                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-white text-emerald-800">
-                    CONFIRMED
-                  </span>
+                  
+                  {/* Cancel / Change Room Booking button while Phase 2 is OPEN */}
+                  {effPhase2Status === 'OPEN' && (
+                    <button
+                      type="button"
+                      onClick={() => setShowPhase2CancelModal(true)}
+                      className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold border border-white/20 transition flex items-center gap-1.5 self-start sm:self-auto"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      Change Room / Cancel Booking
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -550,7 +755,7 @@ export const TwoPhaseBookingPage: React.FC = () => {
                           <div className="flex items-center justify-between mb-1">
                             <span className="text-xs font-bold text-gray-900 truncate">{rm.studentName}</span>
                             <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
-                              Bed {rm.bedNumber}
+                              Bed #{rm.bedNumber}
                             </span>
                           </div>
                           <span className="text-[11px] text-gray-500 font-mono block">Reg: {rm.registerNumber}</span>
@@ -568,20 +773,24 @@ export const TwoPhaseBookingPage: React.FC = () => {
           )}
 
           {/* Phase 2 Closed Notice */}
-          {!hasBooked && phase2Status !== 'OPEN' && (
+          {!hasBooked && effPhase2Status !== 'OPEN' && (
             <div className="bg-white rounded-2xl border border-amber-200 p-8 text-center shadow-xs">
               <div className="w-14 h-14 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-3 border border-amber-200">
                 <Clock className="w-8 h-8" />
               </div>
-              <h3 className="text-lg font-bold text-gray-900">Phase 2 Room Selection is Currently Closed</h3>
+              <h3 className="text-lg font-bold text-gray-900">
+                Phase 2 Room Selection is Currently {effPhase2Status === 'NOT_OPEN' ? 'Not Started Yet' : 'Closed'}
+              </h3>
               <p className="text-xs text-gray-500 max-w-md mx-auto mt-1 leading-relaxed">
-                Phase 2 (floor, room number, and roommate selection) will open once the hostel administration reviews Phase 1 submissions. Please check back shortly.
+                {effPhase2Status === 'NOT_OPEN'
+                  ? `Phase 2 room and roommate selection will open on ${bookingStatus?.phase2StartDate ? formatDateTime(bookingStatus.phase2StartDate) : 'the scheduled date'}.`
+                  : 'Phase 2 has concluded. Room selections are no longer accepted.'}
               </p>
             </div>
           )}
 
           {/* Phase 2 Booking Active Workflow */}
-          {!hasBooked && phase2Status === 'OPEN' && (
+          {!hasBooked && effPhase2Status === 'OPEN' && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Left Column: Room Filter & List (2 cols) */}
               <div className="lg:col-span-2 space-y-4">
@@ -589,24 +798,36 @@ export const TwoPhaseBookingPage: React.FC = () => {
                   <div>
                     <h2 className="text-base font-bold text-gray-900">Select Permitted Room</h2>
                     <p className="text-xs text-gray-500">
-                      Rooms in {theme.portalName} with available bed capacity.
+                      Rooms in {theme.portalName} with real-time remaining usable bed capacity.
                     </p>
                   </div>
 
-                  {/* Floor Filter */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-gray-600">Floor:</span>
-                    <select
-                      value={selectedFloor}
-                      onChange={(e) => setSelectedFloor(e.target.value === '' ? '' : Number(e.target.value))}
-                      className="text-xs font-semibold rounded-xl border border-gray-300 py-1.5 px-3 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  <div className="flex items-center gap-3">
+                    {/* Floor Filter */}
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-semibold text-gray-600">Floor:</span>
+                      <select
+                        value={selectedFloor}
+                        onChange={(e) => setSelectedFloor(e.target.value === '' ? '' : Number(e.target.value))}
+                        className="text-xs font-semibold rounded-xl border border-gray-300 py-1.5 px-3 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">All Floors</option>
+                        <option value="1">Floor 1</option>
+                        <option value="2">Floor 2</option>
+                        <option value="3">Floor 3</option>
+                        <option value="4">Floor 4</option>
+                      </select>
+                    </div>
+
+                    {/* Join Waiting list button if needed */}
+                    <button
+                      type="button"
+                      onClick={() => setShowWaitlistModal(true)}
+                      className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-xl text-xs font-bold transition flex items-center gap-1"
                     >
-                      <option value="">All Floors</option>
-                      <option value="1">Floor 1</option>
-                      <option value="2">Floor 2</option>
-                      <option value="3">Floor 3</option>
-                      <option value="4">Floor 4</option>
-                    </select>
+                      <ListFilter className="w-3.5 h-3.5" />
+                      Join Waiting List
+                    </button>
                   </div>
                 </div>
 
@@ -615,16 +836,26 @@ export const TwoPhaseBookingPage: React.FC = () => {
                     <LoadingSpinner size="md" text="Loading available rooms..." />
                   </div>
                 ) : availableRooms.length === 0 ? (
-                  <div className="py-12 text-center bg-white rounded-2xl border border-gray-200 p-6">
-                    <Bed className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                  <div className="py-12 text-center bg-white rounded-2xl border border-gray-200 p-6 space-y-3">
+                    <Bed className="w-10 h-10 text-gray-300 mx-auto" />
                     <p className="text-sm font-bold text-gray-800">No rooms currently available on this filter</p>
-                    <p className="text-xs text-gray-500 mt-1">Try selecting All Floors or check back soon.</p>
+                    <p className="text-xs text-gray-500 max-w-sm mx-auto">
+                      All eligible rooms might be full. You can join the persistent waiting list to be automatically promoted when a bed is released.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setShowWaitlistModal(true)}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl shadow-xs"
+                    >
+                      <ListFilter className="w-4 h-4" />
+                      Join SEC Hostel Waiting List
+                    </button>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {availableRooms.map((room) => {
                       const isSelected = selectedRoom?.id === room.id;
-                      const totalBeds = room.capacity || 4;
+                      const totalBeds = room.totalCapacity || room.capacity || 4;
                       const available = room.availableBeds;
                       const occupied = room.occupiedBeds || 0;
                       const occupancyPercent = Math.min(100, Math.round((occupied / totalBeds) * 100));
@@ -661,7 +892,7 @@ export const TwoPhaseBookingPage: React.FC = () => {
                               <div className="flex justify-between text-xs mb-1">
                                 <span className="font-semibold text-gray-600">Bed Availability</span>
                                 <span className="font-black text-emerald-700">
-                                  {available} of {totalBeds} Beds Free
+                                  {available} of {totalBeds} Usable Beds Free
                                 </span>
                               </div>
                               <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
@@ -750,7 +981,7 @@ export const TwoPhaseBookingPage: React.FC = () => {
                           </button>
                         </div>
                         <span className="text-[10px] text-gray-400 mt-1 block">
-                          Roommate must be of the same gender and enrolled in SEC Hostel.
+                          Roommates must be of the same gender and registered in SEC Hostel.
                         </span>
                       </div>
 
@@ -810,6 +1041,53 @@ export const TwoPhaseBookingPage: React.FC = () => {
       )}
 
       {/* ======================================================== */}
+      {/* TAB 3: WAITING LIST VIEW (IF STUDENT IS ON WAITLIST)      */}
+      {/* ======================================================== */}
+      {activeTab === 'waitlist' && waitlist && (
+        <div className="bg-white rounded-2xl border border-amber-200 p-6 shadow-sm space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold">
+                <ListFilter className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-gray-900">Your Waiting List Status</h3>
+                <span className="text-xs text-gray-500 font-mono">SEC Hostel Persistent Queue</span>
+              </div>
+            </div>
+            <span className="px-3 py-1 rounded-full text-xs font-black bg-amber-100 text-amber-800 border border-amber-300">
+              Rank #{waitlist.queuePosition || waitlist.priority} in Queue
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+            <div className="p-3 bg-gray-50 rounded-xl">
+              <span className="text-gray-500 block">Hostel Category</span>
+              <span className="font-bold text-gray-900">{waitlist.hostelTypePreference} Hostel</span>
+            </div>
+            <div className="p-3 bg-gray-50 rounded-xl">
+              <span className="text-gray-500 block">Preferred Room Type</span>
+              <span className="font-bold text-gray-900">{waitlist.preferredRoomType?.name || 'Any Room Type'}</span>
+            </div>
+            <div className="p-3 bg-gray-50 rounded-xl">
+              <span className="text-gray-500 block">Joined At</span>
+              <span className="font-bold text-gray-900">{formatDateTime(waitlist.joinedAt)}</span>
+            </div>
+          </div>
+
+          <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-100 text-xs text-blue-900">
+            <p className="font-semibold flex items-center gap-1.5">
+              <Info className="w-4 h-4 text-blue-600" />
+              Automatic Waitlist Promotion Policy:
+            </p>
+            <p className="text-[11px] text-blue-800 mt-1">
+              Whenever any student cancels their booking or room inventory is adjusted, the system automatically offers the free bed to the next compatible student in queue priority. You will receive an in-app alert with 24 hours to accept.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
       {/* MODAL 1: PHASE 1 CONFIRMATION MODAL                      */}
       {/* ======================================================== */}
       {showPhase1ConfirmModal && (
@@ -852,7 +1130,48 @@ export const TwoPhaseBookingPage: React.FC = () => {
       )}
 
       {/* ======================================================== */}
-      {/* MODAL 2: PHASE 2 CONFIRMATION MODAL                      */}
+      {/* MODAL 2: PHASE 1 CANCEL PREFERENCE MODAL                  */}
+      {/* ======================================================== */}
+      {showPhase1CancelModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-100 space-y-4">
+            <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
+              <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
+                <AlertCircle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-gray-900">Cancel Phase 1 Preference</h3>
+                <span className="text-xs text-gray-500">Remove saved preference</span>
+              </div>
+            </div>
+
+            <p className="text-xs text-gray-600 leading-relaxed">
+              Are you sure you want to cancel your saved preference for <strong className="text-gray-900">{bookingStatus?.phase1Preference?.preferredRoomTypeName}</strong>? You can submit a new preference while Phase 1 remains open.
+            </p>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowPhase1CancelModal(false)}
+                className="flex-1 py-2.5 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition"
+              >
+                Keep Preference
+              </button>
+              <button
+                type="button"
+                disabled={cancellingPhase1}
+                onClick={handleCancelPhase1Preference}
+                className="flex-1 py-2.5 px-4 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition"
+              >
+                {cancellingPhase1 ? 'Cancelling...' : 'Confirm Cancel'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL 3: PHASE 2 BOOKING CONFIRM MODAL                    */}
       {/* ======================================================== */}
       {showPhase2ConfirmModal && selectedRoom && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
@@ -918,6 +1237,162 @@ export const TwoPhaseBookingPage: React.FC = () => {
                 {submittingPhase2 ? 'Booking...' : 'Confirm & Book Now'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL 4: PHASE 2 CANCEL BOOKING MODAL                     */}
+      {/* ======================================================== */}
+      {showPhase2CancelModal && myAllocation && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-100 space-y-4">
+            <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
+              <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-gray-900">Cancel Room Booking</h3>
+                <span className="text-xs text-gray-500">Release Assigned Bed</span>
+              </div>
+            </div>
+
+            <div className="p-3 bg-rose-50 rounded-xl border border-rose-200 text-xs text-rose-900 space-y-1">
+              <span className="font-bold block">Warning: Room bed will be released!</span>
+              <p className="text-[11px] leading-relaxed">
+                Cancelling will release your reserved bed in Room <span className="font-bold">{myAllocation.roomNumber}</span>.
+                The bed will immediately be offered to eligible students on the persistent waiting list.
+              </p>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowPhase2CancelModal(false)}
+                className="flex-1 py-2.5 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition"
+              >
+                Keep Booking
+              </button>
+              <button
+                type="button"
+                disabled={cancellingPhase2}
+                onClick={handleCancelPhase2Booking}
+                className="flex-1 py-2.5 px-4 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition"
+              >
+                {cancellingPhase2 ? 'Cancelling...' : 'Confirm Release'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL 5: JOIN WAITING LIST MODAL                          */}
+      {/* ======================================================== */}
+      {showWaitlistModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-100 space-y-4">
+            <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
+              <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center font-bold">
+                <ListFilter className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-gray-900">Join SEC Hostel Waiting List</h3>
+                <span className="text-xs text-gray-500">Automatic Promotion Queue</span>
+              </div>
+            </div>
+
+            <form onSubmit={handleJoinWaitingList} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                  Preferred Room Type
+                </label>
+                <select
+                  value={waitlistPrefTypeId}
+                  onChange={(e) => setWaitlistPrefTypeId(e.target.value === '' ? '' : Number(e.target.value))}
+                  className="w-full px-3 py-2 border rounded-xl"
+                >
+                  <option value="">Any Compatible Room Type</option>
+                  {roomTypes.map((rt) => (
+                    <option key={rt.id} value={rt.id}>
+                      {rt.name} ({rt.capacity} beds)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                    AC Preference
+                  </label>
+                  <select
+                    value={waitlistIsAc ? 'true' : 'false'}
+                    onChange={(e) => setWaitlistIsAc(e.target.value === 'true')}
+                    className="w-full px-3 py-2 border rounded-xl"
+                  >
+                    <option value="false">Non-AC</option>
+                    <option value="true">Air Conditioned (AC)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                    Group Size
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={waitlistGroupSize}
+                    onChange={(e) => setWaitlistGroupSize(parseInt(e.target.value) || 1)}
+                    className="w-full px-3 py-2 border rounded-xl"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                  Floor Preference (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Floor 2 or Floor 3 preferred"
+                  value={waitlistFloor}
+                  onChange={(e) => setWaitlistFloor(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-xl"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                  Reason for Waiting
+                </label>
+                <textarea
+                  rows={2}
+                  value={waitlistReason}
+                  onChange={(e) => setWaitlistReason(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-xl"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2 border-t">
+                <button
+                  type="button"
+                  onClick={() => setShowWaitlistModal(false)}
+                  className="flex-1 py-2.5 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingWaitlist}
+                  className="flex-1 py-2.5 px-4 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl transition"
+                >
+                  {submittingWaitlist ? 'Joining...' : 'Join Queue'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

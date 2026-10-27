@@ -5,3 +5,4 @@ public enum PhaseStatus {
     OPEN,
     CLOSED
 }
+

@@ -26,6 +26,7 @@ export interface Room {
   floorNumber: number;
   status: RoomStatus | string;
   capacity: number;
+  effectiveCapacity?: number;
   totalCapacity?: number;
   occupiedBeds: number;
   availableBeds: number;

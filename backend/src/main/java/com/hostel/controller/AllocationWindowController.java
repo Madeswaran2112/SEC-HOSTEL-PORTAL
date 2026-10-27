@@ -1,9 +1,11 @@
 package com.hostel.controller;
 
 import com.hostel.dto.request.AllocationWindowRequest;
+import com.hostel.dto.request.PhaseScheduleRequest;
 import com.hostel.dto.response.ApiResponse;
 import com.hostel.dto.response.AllocationWindowResponse;
 import com.hostel.enums.AllocationWindowStatus;
+import com.hostel.enums.PhaseStatus;
 import com.hostel.service.AllocationWindowService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -68,7 +70,7 @@ public class AllocationWindowController {
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<AllocationWindowResponse>> changePhase1Status(
             @PathVariable Long id, 
-            @RequestParam com.hostel.enums.PhaseStatus status) {
+            @RequestParam PhaseStatus status) {
         AllocationWindowResponse response = windowService.changePhase1Status(id, status);
         return ResponseEntity.ok(ApiResponse.success("Phase 1 status updated successfully", response));
     }
@@ -77,8 +79,45 @@ public class AllocationWindowController {
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<AllocationWindowResponse>> changePhase2Status(
             @PathVariable Long id, 
-            @RequestParam com.hostel.enums.PhaseStatus status) {
+            @RequestParam PhaseStatus status) {
         AllocationWindowResponse response = windowService.changePhase2Status(id, status);
         return ResponseEntity.ok(ApiResponse.success("Phase 2 status updated successfully", response));
+    }
+
+    @PutMapping("/{id}/schedule")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<AllocationWindowResponse>> updatePhaseSchedule(
+            @PathVariable Long id,
+            @Valid @RequestBody PhaseScheduleRequest request) {
+        AllocationWindowResponse response = windowService.updatePhaseSchedule(id, request);
+        return ResponseEntity.ok(ApiResponse.success("Phase " + request.getPhase() + " schedule updated successfully", response));
+    }
+
+    @PostMapping("/{id}/phase1/open")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<AllocationWindowResponse>> openPhase1(@PathVariable Long id) {
+        AllocationWindowResponse response = windowService.changePhase1Status(id, PhaseStatus.OPEN);
+        return ResponseEntity.ok(ApiResponse.success("Phase 1 opened successfully", response));
+    }
+
+    @PostMapping("/{id}/phase1/close")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<AllocationWindowResponse>> closePhase1(@PathVariable Long id) {
+        AllocationWindowResponse response = windowService.changePhase1Status(id, PhaseStatus.CLOSED);
+        return ResponseEntity.ok(ApiResponse.success("Phase 1 closed successfully", response));
+    }
+
+    @PostMapping("/{id}/phase2/open")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<AllocationWindowResponse>> openPhase2(@PathVariable Long id) {
+        AllocationWindowResponse response = windowService.changePhase2Status(id, PhaseStatus.OPEN);
+        return ResponseEntity.ok(ApiResponse.success("Phase 2 opened successfully", response));
+    }
+
+    @PostMapping("/{id}/phase2/close")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<AllocationWindowResponse>> closePhase2(@PathVariable Long id) {
+        AllocationWindowResponse response = windowService.changePhase2Status(id, PhaseStatus.CLOSED);
+        return ResponseEntity.ok(ApiResponse.success("Phase 2 closed successfully", response));
     }
 }

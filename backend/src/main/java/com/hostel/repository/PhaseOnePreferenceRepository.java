@@ -14,3 +14,4 @@ public interface PhaseOnePreferenceRepository extends JpaRepository<PhaseOnePref
     List<PhaseOnePreference> findByAllocationWindowId(Long windowId);
     boolean existsByStudentIdAndAllocationWindowId(Long studentId, Long windowId);
 }
+

@@ -32,6 +32,21 @@ public class PhaseBookingController {
         return new ResponseEntity<>(ApiResponse.success("Phase 1 room type preference saved successfully", response), HttpStatus.CREATED);
     }
 
+    // Student Phase 1: Cancel preference submission
+    @DeleteMapping("/phase1")
+    public ResponseEntity<ApiResponse<Void>> cancelPhaseOnePreference(
+            @CurrentUser UserDetails userDetails) {
+        bookingService.cancelPhaseOnePreference(userDetails);
+        return ResponseEntity.ok(ApiResponse.success("Phase 1 room type preference cancelled successfully", null));
+    }
+
+    @PostMapping("/phase1/cancel")
+    public ResponseEntity<ApiResponse<Void>> cancelPhaseOnePreferencePost(
+            @CurrentUser UserDetails userDetails) {
+        bookingService.cancelPhaseOnePreference(userDetails);
+        return ResponseEntity.ok(ApiResponse.success("Phase 1 room type preference cancelled successfully", null));
+    }
+
     // Student Phase 1: Get student's submitted preference
     @GetMapping("/phase1")
     public ResponseEntity<ApiResponse<PhaseOnePreferenceResponse>> getMyPhaseOnePreference(
@@ -67,6 +82,14 @@ public class PhaseBookingController {
             @Valid @RequestBody PhaseTwoBookingRequest request) {
         PhaseTwoBookingResponse response = bookingService.bookRoomPhaseTwo(userDetails, request);
         return new ResponseEntity<>(ApiResponse.success("Room booked successfully!", response), HttpStatus.CREATED);
+    }
+
+    // Student Phase 2: Cancel room booking
+    @PostMapping("/phase2/cancel")
+    public ResponseEntity<ApiResponse<Void>> cancelPhaseTwoBooking(
+            @CurrentUser UserDetails userDetails) {
+        bookingService.cancelPhaseTwoBooking(userDetails);
+        return ResponseEntity.ok(ApiResponse.success("Room booking cancelled successfully! The bed has been released and offered to the waiting list.", null));
     }
 
     // Combined Phase 1 & Phase 2 status for student dashboard

@@ -21,7 +21,23 @@ public class AllocationWindowResponse {
     private LocalDateTime startDate;
     private LocalDateTime endDate;
     private AllocationWindowStatus status;
+
+    // Phase 1
     private PhaseStatus phase1Status;
+    private PhaseStatus effectivePhase1Status;
+    private LocalDateTime phase1StartDate;
+    private LocalDateTime phase1EndDate;
+    private String phase1Description;
+
+    // Phase 2
     private PhaseStatus phase2Status;
+    private PhaseStatus effectivePhase2Status;
+    private LocalDateTime phase2StartDate;
+    private LocalDateTime phase2EndDate;
+    private String phase2Description;
+
+    // Server time in Asia/Kolkata
+    private LocalDateTime serverTime;
+
     private LocalDateTime createdAt;
 }

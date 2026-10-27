@@ -19,3 +19,4 @@ public class ValidateRoommateResponse {
     private String gender;
     private String message;
 }
+

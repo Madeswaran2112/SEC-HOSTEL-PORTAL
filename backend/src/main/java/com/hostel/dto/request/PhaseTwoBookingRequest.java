@@ -18,3 +18,4 @@ public class PhaseTwoBookingRequest {
 
     private List<String> roommateRegisterNumbers;
 }
+

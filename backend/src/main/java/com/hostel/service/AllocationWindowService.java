@@ -1,9 +1,11 @@
 package com.hostel.service;
 
 import com.hostel.dto.request.AllocationWindowRequest;
+import com.hostel.dto.request.PhaseScheduleRequest;
 import com.hostel.dto.response.AllocationWindowResponse;
 import com.hostel.entity.AllocationWindow;
 import com.hostel.enums.AllocationWindowStatus;
+import com.hostel.enums.PhaseStatus;
 import com.hostel.exception.BadRequestException;
 import com.hostel.exception.ResourceNotFoundException;
 import com.hostel.repository.AllocationWindowRepository;
@@ -11,6 +13,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -33,6 +38,8 @@ public class AllocationWindowService {
                 .startDate(request.getStartDate())
                 .endDate(request.getEndDate())
                 .status(AllocationWindowStatus.UPCOMING)
+                .phase1Status(PhaseStatus.NOT_OPEN)
+                .phase2Status(PhaseStatus.NOT_OPEN)
                 .build();
                 
         window = windowRepository.save(window);
@@ -81,7 +88,6 @@ public class AllocationWindowService {
         AllocationWindow window = windowRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("AllocationWindow", "id", id));
                 
-        // Could add logic to ensure only one window is OPEN at a time
         if (status == AllocationWindowStatus.OPEN) {
             windowRepository.findByStatus(AllocationWindowStatus.OPEN).forEach(w -> {
                 w.setStatus(AllocationWindowStatus.CLOSED);
@@ -95,24 +101,67 @@ public class AllocationWindowService {
     }
 
     @Transactional
-    public AllocationWindowResponse changePhase1Status(Long id, com.hostel.enums.PhaseStatus status) {
+    public AllocationWindowResponse changePhase1Status(Long id, PhaseStatus status) {
         AllocationWindow window = windowRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("AllocationWindow", "id", id));
         window.setPhase1Status(status);
+        if (status == PhaseStatus.OPEN && window.getPhase1StartDate() == null) {
+            window.setPhase1StartDate(ZonedDateTime.now(ZoneId.of("Asia/Kolkata")).toLocalDateTime());
+        }
         window = windowRepository.save(window);
         return mapToResponse(window);
     }
 
     @Transactional
-    public AllocationWindowResponse changePhase2Status(Long id, com.hostel.enums.PhaseStatus status) {
+    public AllocationWindowResponse changePhase2Status(Long id, PhaseStatus status) {
         AllocationWindow window = windowRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("AllocationWindow", "id", id));
         window.setPhase2Status(status);
+        if (status == PhaseStatus.OPEN && window.getPhase2StartDate() == null) {
+            window.setPhase2StartDate(ZonedDateTime.now(ZoneId.of("Asia/Kolkata")).toLocalDateTime());
+        }
         window = windowRepository.save(window);
         return mapToResponse(window);
     }
 
-    private AllocationWindowResponse mapToResponse(AllocationWindow window) {
+    @Transactional
+    public AllocationWindowResponse updatePhaseSchedule(Long id, PhaseScheduleRequest request) {
+        AllocationWindow window = windowRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("AllocationWindow", "id", id));
+
+        if (request.getStartDate() != null && request.getEndDate() != null) {
+            if (!request.getEndDate().isAfter(request.getStartDate())) {
+                throw new BadRequestException("Phase end date and time must be strictly after the start date and time");
+            }
+        }
+
+        if (request.getPhase() == 1) {
+            if (request.getAcademicYear() != null && !request.getAcademicYear().isBlank()) {
+                window.setAcademicYear(request.getAcademicYear());
+            }
+            if (request.getStartDate() != null) window.setPhase1StartDate(request.getStartDate());
+            if (request.getEndDate() != null) window.setPhase1EndDate(request.getEndDate());
+            if (request.getDescription() != null) window.setPhase1Description(request.getDescription());
+            if (request.getStatus() != null) window.setPhase1Status(request.getStatus());
+        } else if (request.getPhase() == 2) {
+            if (request.getAcademicYear() != null && !request.getAcademicYear().isBlank()) {
+                window.setAcademicYear(request.getAcademicYear());
+            }
+            if (request.getStartDate() != null) window.setPhase2StartDate(request.getStartDate());
+            if (request.getEndDate() != null) window.setPhase2EndDate(request.getEndDate());
+            if (request.getDescription() != null) window.setPhase2Description(request.getDescription());
+            if (request.getStatus() != null) window.setPhase2Status(request.getStatus());
+        } else {
+            throw new BadRequestException("Invalid phase number. Must be 1 or 2");
+        }
+
+        window = windowRepository.save(window);
+        return mapToResponse(window);
+    }
+
+    public AllocationWindowResponse mapToResponse(AllocationWindow window) {
+        LocalDateTime nowKolkata = ZonedDateTime.now(ZoneId.of("Asia/Kolkata")).toLocalDateTime();
+
         return AllocationWindowResponse.builder()
                 .id(window.getId())
                 .name(window.getName())
@@ -121,8 +170,20 @@ public class AllocationWindowService {
                 .startDate(window.getStartDate())
                 .endDate(window.getEndDate())
                 .status(window.getStatus())
-                .phase1Status(window.getPhase1Status() != null ? window.getPhase1Status() : com.hostel.enums.PhaseStatus.NOT_OPEN)
-                .phase2Status(window.getPhase2Status() != null ? window.getPhase2Status() : com.hostel.enums.PhaseStatus.NOT_OPEN)
+                // Phase 1
+                .phase1Status(window.getPhase1Status() != null ? window.getPhase1Status() : PhaseStatus.NOT_OPEN)
+                .effectivePhase1Status(window.getEffectivePhase1Status())
+                .phase1StartDate(window.getPhase1StartDate())
+                .phase1EndDate(window.getPhase1EndDate())
+                .phase1Description(window.getPhase1Description())
+                // Phase 2
+                .phase2Status(window.getPhase2Status() != null ? window.getPhase2Status() : PhaseStatus.NOT_OPEN)
+                .effectivePhase2Status(window.getEffectivePhase2Status())
+                .phase2StartDate(window.getPhase2StartDate())
+                .phase2EndDate(window.getPhase2EndDate())
+                .phase2Description(window.getPhase2Description())
+                // Server time in Asia/Kolkata
+                .serverTime(nowKolkata)
                 .createdAt(window.getCreatedAt())
                 .build();
     }

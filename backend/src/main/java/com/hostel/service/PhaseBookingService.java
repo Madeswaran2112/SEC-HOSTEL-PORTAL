@@ -18,6 +18,8 @@ import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -33,6 +35,8 @@ public class PhaseBookingService {
     private final RoomAllocationRepository allocationRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
+    private final WaitingPoolService waitingPoolService;
+    private final AllocationWindowService windowService;
 
     private StudentProfile getStudentFromUserDetails(UserDetails userDetails) {
         User user = userRepository.findByEmail(userDetails.getUsername())
@@ -51,8 +55,13 @@ public class PhaseBookingService {
         StudentProfile student = getStudentFromUserDetails(userDetails);
         AllocationWindow window = getActiveWindow();
 
-        if (window.getPhase1Status() != PhaseStatus.OPEN) {
-            throw new BadRequestException("Phase 1 room type preference submission is currently CLOSED.");
+        PhaseStatus effectiveStatus = window.getEffectivePhase1Status();
+        if (effectiveStatus == PhaseStatus.NOT_OPEN) {
+            String opensMsg = window.getPhase1StartDate() != null ? " Opens on " + window.getPhase1StartDate() + " (IST)" : "";
+            throw new BadRequestException("Phase 1 room type preference submission has not started yet." + opensMsg);
+        }
+        if (effectiveStatus == PhaseStatus.CLOSED) {
+            throw new BadRequestException("Phase 1 room type preference submission has closed. No further changes are allowed.");
         }
 
         RoomType roomType = roomTypeRepository.findById(request.getPreferredRoomTypeId())
@@ -76,6 +85,22 @@ public class PhaseBookingService {
         return mapPreferenceToResponse(preference);
     }
 
+    @Transactional
+    public void cancelPhaseOnePreference(UserDetails userDetails) {
+        StudentProfile student = getStudentFromUserDetails(userDetails);
+        AllocationWindow window = getActiveWindow();
+
+        if (window.getEffectivePhase1Status() != PhaseStatus.OPEN) {
+            throw new BadRequestException("Phase 1 is currently closed. Preferences cannot be cancelled after the deadline.");
+        }
+
+        preferenceRepository.findByStudentIdAndAllocationWindowId(student.getId(), window.getId())
+                .ifPresent(preferenceRepository::delete);
+
+        student.setAllocationStatus(StudentAllocationStatus.NOT_APPLIED);
+        studentProfileRepository.save(student);
+    }
+
     public PhaseOnePreferenceResponse getMyPhaseOnePreference(UserDetails userDetails) {
         StudentProfile student = getStudentFromUserDetails(userDetails);
         AllocationWindow window = windowRepository.findFirstByStatusOrderByStartDateAsc(AllocationWindowStatus.OPEN)
@@ -95,8 +120,13 @@ public class PhaseBookingService {
         StudentProfile student = getStudentFromUserDetails(userDetails);
         AllocationWindow window = getActiveWindow();
 
-        if (window.getPhase2Status() != PhaseStatus.OPEN) {
-            throw new BadRequestException("Phase 2 room booking is currently CLOSED.");
+        PhaseStatus effectiveStatus = window.getEffectivePhase2Status();
+        if (effectiveStatus == PhaseStatus.NOT_OPEN) {
+            String opensMsg = window.getPhase2StartDate() != null ? " Opens on " + window.getPhase2StartDate() + " (IST)" : "";
+            throw new BadRequestException("Phase 2 room selection has not started yet." + opensMsg);
+        }
+        if (effectiveStatus == PhaseStatus.CLOSED) {
+            throw new BadRequestException("Phase 2 room selection has closed. Submissions are no longer accepted.");
         }
 
         HostelType targetHostelType = (student.getGender() == Gender.MALE) ? HostelType.BOYS : HostelType.GIRLS;
@@ -181,8 +211,13 @@ public class PhaseBookingService {
         StudentProfile leader = getStudentFromUserDetails(userDetails);
         AllocationWindow window = getActiveWindow();
 
-        if (window.getPhase2Status() != PhaseStatus.OPEN) {
-            throw new BadRequestException("Phase 2 room booking is currently CLOSED.");
+        PhaseStatus effectiveStatus = window.getEffectivePhase2Status();
+        if (effectiveStatus == PhaseStatus.NOT_OPEN) {
+            String opensMsg = window.getPhase2StartDate() != null ? " Opens on " + window.getPhase2StartDate() + " (IST)" : "";
+            throw new BadRequestException("Phase 2 room selection has not started yet." + opensMsg);
+        }
+        if (effectiveStatus == PhaseStatus.CLOSED) {
+            throw new BadRequestException("Phase 2 room selection has closed. Submissions are no longer accepted.");
         }
 
         if (allocationRepository.existsByStudentIdAndAllocationWindowId(leader.getId(), window.getId())) {
@@ -192,8 +227,8 @@ public class PhaseBookingService {
         Room room = roomRepository.findByIdWithLock(request.getRoomId())
                 .orElseThrow(() -> new ResourceNotFoundException("Room", "id", request.getRoomId()));
 
-        if (room.getStatus() != RoomStatus.AVAILABLE) {
-            throw new BadRequestException("Room " + room.getRoomNumber() + " is no longer available for booking.");
+        if (room.getStatus() != RoomStatus.AVAILABLE && room.getStatus() != RoomStatus.OCCUPIED) {
+            throw new BadRequestException("Room " + room.getRoomNumber() + " is not available for booking.");
         }
 
         HostelType expectedHostelType = (leader.getGender() == Gender.MALE) ? HostelType.BOYS : HostelType.GIRLS;
@@ -285,10 +320,10 @@ public class PhaseBookingService {
         allocationRepository.saveAll(newAllocations);
 
         room.setOccupiedBeds(room.getOccupiedBeds() + totalGroupSize);
-        if (room.getAvailableBeds() == 0) {
-            room.setStatus(RoomStatus.OCCUPIED);
+        if (room.getAvailableBeds() <= 0) {
+            room.setStatus(RoomStatus.FULL);
         } else {
-            room.setStatus(RoomStatus.AVAILABLE);
+            room.setStatus(RoomStatus.OCCUPIED);
         }
         roomRepository.save(room);
 
@@ -328,6 +363,52 @@ public class PhaseBookingService {
                 .build();
     }
 
+    @Transactional
+    public void cancelPhaseTwoBooking(UserDetails userDetails) {
+        StudentProfile student = getStudentFromUserDetails(userDetails);
+        AllocationWindow window = getActiveWindow();
+
+        PhaseStatus effectiveStatus = window.getEffectivePhase2Status();
+        if (effectiveStatus != PhaseStatus.OPEN) {
+            throw new BadRequestException("Phase 2 is closed. Room bookings cannot be cancelled after the deadline.");
+        }
+
+        RoomAllocation allocation = allocationRepository.findFirstByStudentIdOrderByAllocatedAtDesc(student.getId())
+                .orElseThrow(() -> new BadRequestException("No active booking found to cancel."));
+
+        if (allocation.getStatus() == AllocationStatus.CANCELLED) {
+            throw new BadRequestException("This booking is already cancelled.");
+        }
+
+        Room room = roomRepository.findByIdWithLock(allocation.getRoom().getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Room", "id", allocation.getRoom().getId()));
+
+        allocation.setStatus(AllocationStatus.CANCELLED);
+        allocationRepository.save(allocation);
+
+        // Release bed
+        room.setOccupiedBeds(Math.max(0, room.getOccupiedBeds() - 1));
+        if (room.getStatus() == RoomStatus.FULL || room.getStatus() == RoomStatus.OCCUPIED) {
+            room.setStatus(RoomStatus.AVAILABLE);
+        }
+        roomRepository.save(room);
+
+        student.setAllocationStatus(StudentAllocationStatus.APPLIED);
+        studentProfileRepository.save(student);
+
+        notificationService.createNotification(
+                student.getUser().getId(),
+                "Room Booking Cancelled",
+                "Your booking for Room " + room.getRoomNumber() + " has been cancelled. The bed has been released.",
+                NotificationType.ALLOCATION,
+                "ROOM",
+                room.getId()
+        );
+
+        // TRIGGER AUTOMATIC WAITLIST PROMOTION
+        waitingPoolService.promoteNextCandidate(room, window);
+    }
+
     public BookingStatusResponse getMyBookingStatus(UserDetails userDetails) {
         StudentProfile student = getStudentFromUserDetails(userDetails);
         AllocationWindow window = windowRepository.findFirstByStatusOrderByStartDateAsc(AllocationWindowStatus.OPEN)
@@ -344,6 +425,11 @@ public class PhaseBookingService {
                 ? allocationRepository.findByStudentIdAndAllocationWindowId(student.getId(), window.getId())
                 : allocationRepository.findFirstByStudentIdOrderByAllocatedAtDesc(student.getId());
 
+        // Ignore cancelled allocations
+        if (myAllocationOpt.isPresent() && myAllocationOpt.get().getStatus() == AllocationStatus.CANCELLED) {
+            myAllocationOpt = Optional.empty();
+        }
+
         AllocationResponse myAllocationResponse = myAllocationOpt.map(AllocationMapper::toResponse).orElse(null);
 
         List<AllocationResponse> roommates = new ArrayList<>();
@@ -354,20 +440,36 @@ public class PhaseBookingService {
                 roommates = allocationRepository.findByRoomIdAndAllocationWindowId(myAlloc.getRoom().getId(), windowId)
                         .stream()
                         .filter(a -> !a.getStudent().getId().equals(student.getId()))
+                        .filter(a -> a.getStatus() != AllocationStatus.CANCELLED)
                         .map(AllocationMapper::toResponse)
                         .collect(Collectors.toList());
             }
         }
 
+        LocalDateTime nowKolkata = ZonedDateTime.now(ZoneId.of("Asia/Kolkata")).toLocalDateTime();
+        WaitingPoolResponse waitlistEntry = (window != null)
+                ? waitingPoolService.getMyStatus(window.getId(), userDetails)
+                : waitingPoolService.getMyStatus(null, userDetails);
+
         return BookingStatusResponse.builder()
-                .window(window != null ? mapWindowToResponse(window) : null)
+                .window(window != null ? windowService.mapToResponse(window) : null)
                 .phase1Status(window != null && window.getPhase1Status() != null ? window.getPhase1Status() : PhaseStatus.NOT_OPEN)
+                .effectivePhase1Status(window != null ? window.getEffectivePhase1Status() : PhaseStatus.NOT_OPEN)
+                .phase1StartDate(window != null ? window.getPhase1StartDate() : null)
+                .phase1EndDate(window != null ? window.getPhase1EndDate() : null)
+                .phase1Description(window != null ? window.getPhase1Description() : null)
                 .phase2Status(window != null && window.getPhase2Status() != null ? window.getPhase2Status() : PhaseStatus.NOT_OPEN)
+                .effectivePhase2Status(window != null ? window.getEffectivePhase2Status() : PhaseStatus.NOT_OPEN)
+                .phase2StartDate(window != null ? window.getPhase2StartDate() : null)
+                .phase2EndDate(window != null ? window.getPhase2EndDate() : null)
+                .phase2Description(window != null ? window.getPhase2Description() : null)
+                .serverTime(nowKolkata)
                 .hasSubmittedPhase1(preference != null)
                 .phase1Preference(preference != null ? mapPreferenceToResponse(preference) : null)
                 .hasBookedPhase2(myAllocationOpt.isPresent())
                 .allocation(myAllocationResponse)
                 .roommates(roommates)
+                .waitlistEntry(waitlistEntry)
                 .build();
     }
 
@@ -399,6 +501,7 @@ public class PhaseBookingService {
             return Collections.emptyList();
         }
         return allocationRepository.findByAllocationWindowId(targetWindowId).stream()
+                .filter(a -> a.getStatus() != AllocationStatus.CANCELLED)
                 .map(AllocationMapper::toResponse)
                 .collect(Collectors.toList());
     }
@@ -417,21 +520,6 @@ public class PhaseBookingService {
                 .isAc(p.getIsAc())
                 .submittedAt(p.getSubmittedAt())
                 .updatedAt(p.getUpdatedAt())
-                .build();
-    }
-
-    private AllocationWindowResponse mapWindowToResponse(AllocationWindow w) {
-        return AllocationWindowResponse.builder()
-                .id(w.getId())
-                .name(w.getName())
-                .academicYear(w.getAcademicYear())
-                .semester(w.getSemester())
-                .startDate(w.getStartDate())
-                .endDate(w.getEndDate())
-                .status(w.getStatus())
-                .phase1Status(w.getPhase1Status())
-                .phase2Status(w.getPhase2Status())
-                .createdAt(w.getCreatedAt())
                 .build();
     }
 }

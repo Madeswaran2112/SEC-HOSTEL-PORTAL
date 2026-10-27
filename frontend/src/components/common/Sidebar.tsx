@@ -35,13 +35,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     { label: 'Rooms', path: '/admin/rooms', icon: DoorOpen },
     { label: 'Room Types', path: '/admin/room-types', icon: Layers },
     { label: 'Students', path: '/admin/students', icon: Users },
-    { label: 'Groups', path: '/admin/groups', icon: UserCheck },
-    { label: 'Allocation Windows', path: '/admin/allocation-windows', icon: Calendar },
+    { label: 'Phase Scheduler', path: '/admin/allocation-windows', icon: Calendar },
     { label: 'Allocations Overview', path: '/admin/allocations', icon: Sliders },
-    { label: 'Run Auto-Allocation', path: '/admin/allocations/run', icon: PlayCircle },
-    { label: 'Manual Allocation', path: '/admin/allocations/manual', icon: UserPlus },
     { label: 'Final Allocation List', path: '/admin/allocations/final-list', icon: FileCheck2 },
-    { label: 'Waiting Pool', path: '/admin/waiting-pool', icon: ListFilter },
+    { label: 'Waiting List', path: '/admin/waiting-pool', icon: ListFilter },
     { label: 'Export Center', path: '/admin/export', icon: FileDown },
   ];
 

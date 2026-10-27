@@ -4,6 +4,7 @@ import {
   Allocation,
   AllocationWindow,
   AllocationWindowRequest,
+  PhaseScheduleRequest,
   ManualAllocationRequest,
   WaitingPoolEntry,
   WaitingPoolJoinRequest,
@@ -99,12 +100,42 @@ export const windowApi = {
   updatePhase2Status: async (id: string | number, status: string): Promise<ApiResponse<AllocationWindow>> => {
     const response = await axiosInstance.patch(`/allocation-windows/${id}/phase2-status?status=${status}`);
     return response.data;
+  },
+
+  updateSchedule: async (id: string | number, data: PhaseScheduleRequest): Promise<ApiResponse<AllocationWindow>> => {
+    const response = await axiosInstance.put(`/allocation-windows/${id}/schedule`, data);
+    return response.data;
+  },
+
+  openPhase1: async (id: string | number): Promise<ApiResponse<AllocationWindow>> => {
+    const response = await axiosInstance.post(`/allocation-windows/${id}/phase1/open`);
+    return response.data;
+  },
+
+  closePhase1: async (id: string | number): Promise<ApiResponse<AllocationWindow>> => {
+    const response = await axiosInstance.post(`/allocation-windows/${id}/phase1/close`);
+    return response.data;
+  },
+
+  openPhase2: async (id: string | number): Promise<ApiResponse<AllocationWindow>> => {
+    const response = await axiosInstance.post(`/allocation-windows/${id}/phase2/open`);
+    return response.data;
+  },
+
+  closePhase2: async (id: string | number): Promise<ApiResponse<AllocationWindow>> => {
+    const response = await axiosInstance.post(`/allocation-windows/${id}/phase2/close`);
+    return response.data;
   }
 };
 
 export const bookingApi = {
   submitPhaseOne: async (data: PhaseOnePreferenceRequest): Promise<ApiResponse<PhaseOnePreferenceResponse>> => {
     const response = await axiosInstance.post('/booking/phase1', data);
+    return response.data;
+  },
+
+  cancelPhaseOne: async (): Promise<ApiResponse<null>> => {
+    const response = await axiosInstance.delete('/booking/phase1');
     return response.data;
   },
 
@@ -131,6 +162,11 @@ export const bookingApi = {
 
   bookRoomPhaseTwo: async (data: PhaseTwoBookingRequest): Promise<ApiResponse<PhaseTwoBookingResponse>> => {
     const response = await axiosInstance.post('/booking/phase2/book', data);
+    return response.data;
+  },
+
+  cancelPhaseTwo: async (): Promise<ApiResponse<null>> => {
+    const response = await axiosInstance.post('/booking/phase2/cancel');
     return response.data;
   },
 
@@ -171,33 +207,52 @@ export const waitingPoolApi = {
     const response = await axiosInstance.get(url);
     return response.data;
   },
-  
-  getAll: async (windowId: string | number, page = 0, size = 10): Promise<ApiResponse<PagedResponse<WaitingPoolEntry>>> => {
-    const response = await axiosInstance.get(`/waiting-pool?windowId=${windowId}&page=${page}&size=${size}`);
+
+  acceptOffer: async (poolEntryId: string | number): Promise<ApiResponse<WaitingPoolEntry>> => {
+    const response = await axiosInstance.post(`/waiting-pool/accept-offer?poolEntryId=${poolEntryId}`);
     return response.data;
   },
 
-  getPending: async (hostelType?: string): Promise<ApiResponse<WaitingPoolEntry[]>> => {
-    let url = '/waiting-pool/admin/pending';
-    if (hostelType) url += `?hostelType=${hostelType}`;
+  declineOffer: async (poolEntryId: string | number): Promise<ApiResponse<null>> => {
+    const response = await axiosInstance.post(`/waiting-pool/decline-offer?poolEntryId=${poolEntryId}`);
+    return response.data;
+  },
+
+  getAdminWaitlist: async (
+    windowId: string | number,
+    hostelType?: string,
+    status?: string,
+    search?: string,
+    page = 0,
+    size = 10
+  ): Promise<ApiResponse<PagedResponse<WaitingPoolEntry>>> => {
+    let url = `/waiting-pool/admin?windowId=${windowId}&page=${page}&size=${size}`;
+    if (hostelType) url += `&hostelType=${hostelType}`;
+    if (status && status !== 'ALL') url += `&status=${status}`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
     const response = await axiosInstance.get(url);
     return response.data;
   },
 
-  verify: async (id: string | number): Promise<ApiResponse<WaitingPoolEntry>> => {
-    const response = await axiosInstance.put(`/waiting-pool/${id}/verify`);
+  adminIssueOffer: async (id: string | number, roomId: string | number): Promise<ApiResponse<null>> => {
+    const response = await axiosInstance.post(`/waiting-pool/${id}/issue-offer?roomId=${roomId}`);
     return response.data;
   },
 
-  approve: async (id: string | number): Promise<ApiResponse<WaitingPoolEntry>> => {
-    const response = await axiosInstance.put(`/waiting-pool/${id}/approve`);
+  adminCancel: async (id: string | number, reason: string): Promise<ApiResponse<null>> => {
+    const response = await axiosInstance.post(`/waiting-pool/${id}/cancel?reason=${encodeURIComponent(reason)}`);
     return response.data;
   },
 
-  reject: async (id: string | number, reason?: string): Promise<ApiResponse<WaitingPoolEntry>> => {
-    let url = `/waiting-pool/${id}/reject`;
-    if (reason) url += `?reason=${encodeURIComponent(reason)}`;
+  adminUpdatePriority: async (id: string | number, priority: number, reason?: string): Promise<ApiResponse<null>> => {
+    let url = `/waiting-pool/${id}/priority?priority=${priority}`;
+    if (reason) url += `&reason=${encodeURIComponent(reason)}`;
     const response = await axiosInstance.put(url);
+    return response.data;
+  },
+
+  adminExceptionalAllocate: async (id: string | number, roomId: string | number, reason: string): Promise<ApiResponse<null>> => {
+    const response = await axiosInstance.post(`/waiting-pool/${id}/exceptional-allocate?roomId=${roomId}&reason=${encodeURIComponent(reason)}`);
     return response.data;
   }
 };
