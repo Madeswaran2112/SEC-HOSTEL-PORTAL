@@ -104,10 +104,30 @@ public class AllocationWindowService {
     public AllocationWindowResponse changePhase1Status(Long id, PhaseStatus status) {
         AllocationWindow window = windowRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("AllocationWindow", "id", id));
-        window.setPhase1Status(status);
-        if (status == PhaseStatus.OPEN && window.getPhase1StartDate() == null) {
-            window.setPhase1StartDate(ZonedDateTime.now(ZoneId.of("Asia/Kolkata")).toLocalDateTime());
+
+        LocalDateTime now = ZonedDateTime.now(ZoneId.of("Asia/Kolkata")).toLocalDateTime();
+
+        if (status == PhaseStatus.OPEN) {
+            if (window.getPhase1EndDate() != null && now.isAfter(window.getPhase1EndDate())) {
+                throw new BadRequestException("Cannot open Phase 1 because the scheduled end date (" + 
+                        window.getPhase1EndDate() + ") has already passed. Please update the schedule with a future end date before opening.");
+            }
+            if (window.getPhase1StartDate() == null || now.isBefore(window.getPhase1StartDate())) {
+                window.setPhase1StartDate(now);
+            }
+            if (window.getPhase1EndDate() == null) {
+                window.setPhase1EndDate(now.plusDays(7));
+            }
+            window.setPhase1Status(PhaseStatus.OPEN);
+        } else if (status == PhaseStatus.CLOSED) {
+            window.setPhase1Status(PhaseStatus.CLOSED);
+            if (window.getPhase1EndDate() == null || now.isBefore(window.getPhase1EndDate())) {
+                window.setPhase1EndDate(now);
+            }
+        } else {
+            window.setPhase1Status(status);
         }
+
         window = windowRepository.save(window);
         return mapToResponse(window);
     }
@@ -116,10 +136,30 @@ public class AllocationWindowService {
     public AllocationWindowResponse changePhase2Status(Long id, PhaseStatus status) {
         AllocationWindow window = windowRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("AllocationWindow", "id", id));
-        window.setPhase2Status(status);
-        if (status == PhaseStatus.OPEN && window.getPhase2StartDate() == null) {
-            window.setPhase2StartDate(ZonedDateTime.now(ZoneId.of("Asia/Kolkata")).toLocalDateTime());
+
+        LocalDateTime now = ZonedDateTime.now(ZoneId.of("Asia/Kolkata")).toLocalDateTime();
+
+        if (status == PhaseStatus.OPEN) {
+            if (window.getPhase2EndDate() != null && now.isAfter(window.getPhase2EndDate())) {
+                throw new BadRequestException("Cannot open Phase 2 because the scheduled end date (" + 
+                        window.getPhase2EndDate() + ") has already passed. Please update the schedule with a future end date before opening.");
+            }
+            if (window.getPhase2StartDate() == null || now.isBefore(window.getPhase2StartDate())) {
+                window.setPhase2StartDate(now);
+            }
+            if (window.getPhase2EndDate() == null) {
+                window.setPhase2EndDate(now.plusDays(7));
+            }
+            window.setPhase2Status(PhaseStatus.OPEN);
+        } else if (status == PhaseStatus.CLOSED) {
+            window.setPhase2Status(PhaseStatus.CLOSED);
+            if (window.getPhase2EndDate() == null || now.isBefore(window.getPhase2EndDate())) {
+                window.setPhase2EndDate(now);
+            }
+        } else {
+            window.setPhase2Status(status);
         }
+
         window = windowRepository.save(window);
         return mapToResponse(window);
     }
@@ -135,6 +175,8 @@ public class AllocationWindowService {
             }
         }
 
+        LocalDateTime now = ZonedDateTime.now(ZoneId.of("Asia/Kolkata")).toLocalDateTime();
+
         if (request.getPhase() == 1) {
             if (request.getAcademicYear() != null && !request.getAcademicYear().isBlank()) {
                 window.setAcademicYear(request.getAcademicYear());
@@ -142,7 +184,19 @@ public class AllocationWindowService {
             if (request.getStartDate() != null) window.setPhase1StartDate(request.getStartDate());
             if (request.getEndDate() != null) window.setPhase1EndDate(request.getEndDate());
             if (request.getDescription() != null) window.setPhase1Description(request.getDescription());
-            if (request.getStatus() != null) window.setPhase1Status(request.getStatus());
+            if (request.getStatus() != null) {
+                window.setPhase1Status(request.getStatus());
+            } else {
+                if (window.getPhase1StartDate() != null && window.getPhase1EndDate() != null) {
+                    if (now.isAfter(window.getPhase1StartDate()) && now.isBefore(window.getPhase1EndDate())) {
+                        window.setPhase1Status(PhaseStatus.OPEN);
+                    } else if (now.isBefore(window.getPhase1StartDate())) {
+                        window.setPhase1Status(PhaseStatus.NOT_OPEN);
+                    } else if (now.isAfter(window.getPhase1EndDate())) {
+                        window.setPhase1Status(PhaseStatus.CLOSED);
+                    }
+                }
+            }
         } else if (request.getPhase() == 2) {
             if (request.getAcademicYear() != null && !request.getAcademicYear().isBlank()) {
                 window.setAcademicYear(request.getAcademicYear());
@@ -150,7 +204,19 @@ public class AllocationWindowService {
             if (request.getStartDate() != null) window.setPhase2StartDate(request.getStartDate());
             if (request.getEndDate() != null) window.setPhase2EndDate(request.getEndDate());
             if (request.getDescription() != null) window.setPhase2Description(request.getDescription());
-            if (request.getStatus() != null) window.setPhase2Status(request.getStatus());
+            if (request.getStatus() != null) {
+                window.setPhase2Status(request.getStatus());
+            } else {
+                if (window.getPhase2StartDate() != null && window.getPhase2EndDate() != null) {
+                    if (now.isAfter(window.getPhase2StartDate()) && now.isBefore(window.getPhase2EndDate())) {
+                        window.setPhase2Status(PhaseStatus.OPEN);
+                    } else if (now.isBefore(window.getPhase2StartDate())) {
+                        window.setPhase2Status(PhaseStatus.NOT_OPEN);
+                    } else if (now.isAfter(window.getPhase2EndDate())) {
+                        window.setPhase2Status(PhaseStatus.CLOSED);
+                    }
+                }
+            }
         } else {
             throw new BadRequestException("Invalid phase number. Must be 1 or 2");
         }

@@ -61,19 +61,22 @@ export const AllocationWindows: React.FC = () => {
       setLoading(true);
       const res = await windowApi.getAll(page, size);
       if (res.data) {
-        const list = res.data.content || [];
+        const raw = res.data;
+        const list: AllocationWindow[] = Array.isArray(raw) ? raw : ((raw as any).content || []);
         setWindows(list);
-        setTotalElements(res.data.totalElements || 0);
-        setTotalPages(res.data.totalPages || 0);
+        setTotalElements(list.length);
+        setTotalPages(1);
 
         if (list.length > 0) {
-          const current = selectedWindow ? (list.find(w => w.id === selectedWindow.id) || list[0]) : list[0];
+          const current = selectedWindow
+            ? (list.find(w => String(w.id) === String(selectedWindow.id)) || list[0])
+            : list[0];
           setSelectedWindow(current);
           populateScheduleForms(current);
         }
       }
-    } catch {
-      toast.error('Failed to load allocation windows');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to load allocation windows');
     } finally {
       setLoading(false);
     }
@@ -114,24 +117,50 @@ export const AllocationWindows: React.FC = () => {
 
   const handleSavePhase1Schedule = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedWindow) return;
+    if (!selectedWindow) {
+      toast.error('Please select an allocation window first');
+      return;
+    }
 
-    if (p1StartDate && p1EndDate && new Date(p1EndDate) <= new Date(p1StartDate)) {
+    if (!p1AcademicYear || p1AcademicYear.trim() === '') {
+      toast.error('Academic year is required');
+      return;
+    }
+
+    if (!p1StartDate) {
+      toast.error('Phase 1 Start Date & Time is required');
+      return;
+    }
+
+    if (!p1EndDate) {
+      toast.error('Phase 1 End Date & Time is required');
+      return;
+    }
+
+    if (new Date(p1EndDate) <= new Date(p1StartDate)) {
       toast.error('Phase 1 End Date & Time must be later than Start Date & Time');
       return;
     }
 
     try {
       setSavingP1(true);
+      const formattedStart = p1StartDate.length === 16 ? `${p1StartDate}:00` : p1StartDate;
+      const formattedEnd = p1EndDate.length === 16 ? `${p1EndDate}:00` : p1EndDate;
+
       const payload: PhaseScheduleRequest = {
         phase: 1,
-        academicYear: p1AcademicYear,
-        startDate: p1StartDate ? new Date(p1StartDate).toISOString() : undefined,
-        endDate: p1EndDate ? new Date(p1EndDate).toISOString() : undefined,
+        academicYear: p1AcademicYear.trim(),
+        startDate: formattedStart,
+        endDate: formattedEnd,
         description: p1Description
       };
-      await windowApi.updateSchedule(selectedWindow.id, payload);
-      toast.success('Phase 1 schedule updated successfully');
+
+      const res = await windowApi.updateSchedule(selectedWindow.id, payload);
+      toast.success('Phase 1 schedule saved successfully');
+      if (res.data) {
+        setSelectedWindow(res.data);
+        populateScheduleForms(res.data);
+      }
       fetchWindows();
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to save Phase 1 schedule');
@@ -142,24 +171,50 @@ export const AllocationWindows: React.FC = () => {
 
   const handleSavePhase2Schedule = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedWindow) return;
+    if (!selectedWindow) {
+      toast.error('Please select an allocation window first');
+      return;
+    }
 
-    if (p2StartDate && p2EndDate && new Date(p2EndDate) <= new Date(p2StartDate)) {
+    if (!p2AcademicYear || p2AcademicYear.trim() === '') {
+      toast.error('Academic year is required');
+      return;
+    }
+
+    if (!p2StartDate) {
+      toast.error('Phase 2 Start Date & Time is required');
+      return;
+    }
+
+    if (!p2EndDate) {
+      toast.error('Phase 2 End Date & Time is required');
+      return;
+    }
+
+    if (new Date(p2EndDate) <= new Date(p2StartDate)) {
       toast.error('Phase 2 End Date & Time must be later than Start Date & Time');
       return;
     }
 
     try {
       setSavingP2(true);
+      const formattedStart = p2StartDate.length === 16 ? `${p2StartDate}:00` : p2StartDate;
+      const formattedEnd = p2EndDate.length === 16 ? `${p2EndDate}:00` : p2EndDate;
+
       const payload: PhaseScheduleRequest = {
         phase: 2,
-        academicYear: p2AcademicYear,
-        startDate: p2StartDate ? new Date(p2StartDate).toISOString() : undefined,
-        endDate: p2EndDate ? new Date(p2EndDate).toISOString() : undefined,
+        academicYear: p2AcademicYear.trim(),
+        startDate: formattedStart,
+        endDate: formattedEnd,
         description: p2Description
       };
-      await windowApi.updateSchedule(selectedWindow.id, payload);
-      toast.success('Phase 2 schedule updated successfully');
+
+      const res = await windowApi.updateSchedule(selectedWindow.id, payload);
+      toast.success('Phase 2 schedule saved successfully');
+      if (res.data) {
+        setSelectedWindow(res.data);
+        populateScheduleForms(res.data);
+      }
       fetchWindows();
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to save Phase 2 schedule');
@@ -169,46 +224,98 @@ export const AllocationWindows: React.FC = () => {
   };
 
   const handleOpenPhase1 = async () => {
-    if (!selectedWindow) return;
+    if (!selectedWindow) {
+      toast.error('Please select an allocation window first');
+      return;
+    }
+
+    if (p1StartDate && new Date(p1StartDate) > new Date()) {
+      if (!window.confirm('The scheduled start time is in the future. Are you sure you want to manually OPEN Phase 1 now as an administrative override?')) {
+        return;
+      }
+    }
+
     try {
-      await windowApi.openPhase1(selectedWindow.id);
-      toast.success('Phase 1 is now OPEN for student submissions');
+      const res = await windowApi.openPhase1(selectedWindow.id);
+      toast.success('Phase 1 is now OPEN for student preference submissions');
+      if (res.data) {
+        setSelectedWindow(res.data);
+        populateScheduleForms(res.data);
+      }
       fetchWindows();
-    } catch {
-      toast.error('Failed to open Phase 1');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to open Phase 1');
     }
   };
 
   const handleClosePhase1 = async () => {
-    if (!selectedWindow) return;
+    if (!selectedWindow) {
+      toast.error('Please select an allocation window first');
+      return;
+    }
+
+    if (!window.confirm('Are you sure you want to CLOSE Phase 1? New student preference submissions will be immediately blocked.')) {
+      return;
+    }
+
     try {
-      await windowApi.closePhase1(selectedWindow.id);
+      const res = await windowApi.closePhase1(selectedWindow.id);
       toast.success('Phase 1 is now CLOSED');
+      if (res.data) {
+        setSelectedWindow(res.data);
+        populateScheduleForms(res.data);
+      }
       fetchWindows();
-    } catch {
-      toast.error('Failed to close Phase 1');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to close Phase 1');
     }
   };
 
   const handleOpenPhase2 = async () => {
-    if (!selectedWindow) return;
+    if (!selectedWindow) {
+      toast.error('Please select an allocation window first');
+      return;
+    }
+
+    if (p2StartDate && new Date(p2StartDate) > new Date()) {
+      if (!window.confirm('The scheduled start time is in the future. Are you sure you want to manually OPEN Phase 2 now as an administrative override?')) {
+        return;
+      }
+    }
+
     try {
-      await windowApi.openPhase2(selectedWindow.id);
-      toast.success('Phase 2 is now OPEN for room and roommate selection');
+      const res = await windowApi.openPhase2(selectedWindow.id);
+      toast.success('Phase 2 is now OPEN for live room and roommate selection');
+      if (res.data) {
+        setSelectedWindow(res.data);
+        populateScheduleForms(res.data);
+      }
       fetchWindows();
-    } catch {
-      toast.error('Failed to open Phase 2');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to open Phase 2');
     }
   };
 
   const handleClosePhase2 = async () => {
-    if (!selectedWindow) return;
+    if (!selectedWindow) {
+      toast.error('Please select an allocation window first');
+      return;
+    }
+
+    if (!window.confirm('Are you sure you want to CLOSE Phase 2? Live room bookings will be immediately blocked.')) {
+      return;
+    }
+
     try {
-      await windowApi.closePhase2(selectedWindow.id);
+      const res = await windowApi.closePhase2(selectedWindow.id);
       toast.success('Phase 2 is now CLOSED');
+      if (res.data) {
+        setSelectedWindow(res.data);
+        populateScheduleForms(res.data);
+      }
       fetchWindows();
-    } catch {
-      toast.error('Failed to close Phase 2');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to close Phase 2');
     }
   };
 
