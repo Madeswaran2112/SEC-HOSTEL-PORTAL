@@ -1,6 +1,20 @@
 import axiosInstance from './axiosInstance';
 import { ApiResponse, PagedResponse } from '../types/common';
-import { Allocation, AllocationWindow, AllocationWindowRequest, ManualAllocationRequest, WaitingPoolEntry, WaitingPoolJoinRequest } from '../types/allocation';
+import {
+  Allocation,
+  AllocationWindow,
+  AllocationWindowRequest,
+  ManualAllocationRequest,
+  WaitingPoolEntry,
+  WaitingPoolJoinRequest,
+  PhaseOnePreferenceRequest,
+  PhaseOnePreferenceResponse,
+  ValidateRoommateResponse,
+  PhaseTwoBookingRequest,
+  PhaseTwoBookingResponse,
+  BookingStatusResponse
+} from '../types/allocation';
+import { Room } from '../types/room';
 
 export const allocationApi = {
   autoRun: async (windowId: string | number): Promise<ApiResponse<any>> => {
@@ -67,13 +81,73 @@ export const windowApi = {
     return response.data;
   },
   
-  update: async (id: string, data: AllocationWindowRequest): Promise<ApiResponse<AllocationWindow>> => {
+  update: async (id: string | number, data: AllocationWindowRequest): Promise<ApiResponse<AllocationWindow>> => {
     const response = await axiosInstance.put(`/allocation-windows/${id}`, data);
     return response.data;
   },
   
-  updateStatus: async (id: string, status: string): Promise<ApiResponse<AllocationWindow>> => {
-    const response = await axiosInstance.patch(`/allocation-windows/${id}/status`, { status });
+  updateStatus: async (id: string | number, status: string): Promise<ApiResponse<AllocationWindow>> => {
+    const response = await axiosInstance.patch(`/allocation-windows/${id}/status?status=${status}`);
+    return response.data;
+  },
+
+  updatePhase1Status: async (id: string | number, status: string): Promise<ApiResponse<AllocationWindow>> => {
+    const response = await axiosInstance.patch(`/allocation-windows/${id}/phase1-status?status=${status}`);
+    return response.data;
+  },
+
+  updatePhase2Status: async (id: string | number, status: string): Promise<ApiResponse<AllocationWindow>> => {
+    const response = await axiosInstance.patch(`/allocation-windows/${id}/phase2-status?status=${status}`);
+    return response.data;
+  }
+};
+
+export const bookingApi = {
+  submitPhaseOne: async (data: PhaseOnePreferenceRequest): Promise<ApiResponse<PhaseOnePreferenceResponse>> => {
+    const response = await axiosInstance.post('/booking/phase1', data);
+    return response.data;
+  },
+
+  getMyPhaseOnePreference: async (): Promise<ApiResponse<PhaseOnePreferenceResponse>> => {
+    const response = await axiosInstance.get('/booking/phase1');
+    return response.data;
+  },
+
+  getPhaseTwoRooms: async (floorNumber?: number, roomTypeId?: number, isAc?: boolean): Promise<ApiResponse<Room[]>> => {
+    let url = '/booking/phase2/rooms';
+    const params: string[] = [];
+    if (floorNumber !== undefined && floorNumber !== null) params.push(`floorNumber=${floorNumber}`);
+    if (roomTypeId !== undefined && roomTypeId !== null) params.push(`roomTypeId=${roomTypeId}`);
+    if (isAc !== undefined && isAc !== null) params.push(`isAc=${isAc}`);
+    if (params.length > 0) url += `?${params.join('&')}`;
+    const response = await axiosInstance.get(url);
+    return response.data;
+  },
+
+  validateRoommate: async (registerNumber: string): Promise<ApiResponse<ValidateRoommateResponse>> => {
+    const response = await axiosInstance.post('/booking/phase2/validate-roommate', { registerNumber });
+    return response.data;
+  },
+
+  bookRoomPhaseTwo: async (data: PhaseTwoBookingRequest): Promise<ApiResponse<PhaseTwoBookingResponse>> => {
+    const response = await axiosInstance.post('/booking/phase2/book', data);
+    return response.data;
+  },
+
+  getStatus: async (): Promise<ApiResponse<BookingStatusResponse>> => {
+    const response = await axiosInstance.get('/booking/status');
+    return response.data;
+  },
+
+  getAdminPhase1Submissions: async (windowId?: string | number): Promise<ApiResponse<PhaseOnePreferenceResponse[]>> => {
+    const url = windowId ? `/booking/admin/phase1-submissions?windowId=${windowId}` : '/booking/admin/phase1-submissions';
+    const response = await axiosInstance.get(url);
+    return response.data;
+  },
+
+  getAdminPhase2Selections: async (windowId?: string | number): Promise<ApiResponse<Allocation[]>> => {
+    const url = windowId ? `/booking/admin/phase2-selections?windowId=${windowId}` : '/booking/admin/phase2-selections';
+    const response = await axiosInstance.get(url);
     return response.data;
   }
 };
@@ -127,4 +201,3 @@ export const waitingPoolApi = {
     return response.data;
   }
 };
-

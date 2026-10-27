@@ -16,7 +16,11 @@ public class RoomRequest {
     @NotBlank(message = "Room number is required")
     private String roomNumber;
 
+    private String building;
+
     @NotNull(message = "Floor number is required")
     @Min(value = 0, message = "Floor number must be at least 0")
     private Integer floorNumber;
+
+    private Integer totalCapacity;
 }

@@ -3,6 +3,7 @@ package com.hostel.service;
 import com.hostel.dto.request.StudentUpdateRequest;
 import com.hostel.dto.response.PagedResponse;
 import com.hostel.dto.response.StudentResponse;
+import com.hostel.entity.RoomAllocation;
 import com.hostel.entity.StudentProfile;
 import com.hostel.entity.User;
 import com.hostel.enums.Gender;
@@ -11,6 +12,7 @@ import com.hostel.exception.ResourceNotFoundException;
 import com.hostel.mapper.StudentMapper;
 import com.hostel.repository.StudentProfileRepository;
 import com.hostel.repository.UserRepository;
+import com.hostel.repository.RoomAllocationRepository;
 import com.hostel.util.PaginationUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -32,6 +34,8 @@ public class StudentService {
 
     private final StudentProfileRepository studentProfileRepository;
     private final UserRepository userRepository;
+    private final RoomAllocationRepository roomAllocationRepository;
+    private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
     public StudentResponse getCurrentStudentProfile(UserDetails userDetails) {
         User user = userRepository.findByEmail(userDetails.getUsername())
@@ -109,5 +113,96 @@ public class StudentService {
         stats.put("allocated", allocated);
         
         return stats;
+    }
+
+    @Transactional
+    public StudentResponse createStudent(com.hostel.dto.request.AdminStudentCreateRequest request) {
+        String reg = request.getRegisterNumber().trim().toUpperCase();
+        if (studentProfileRepository.existsByRegisterNumberIgnoreCase(reg)) {
+            throw new com.hostel.exception.DuplicateResourceException("Student with register number '" + reg + "' already exists");
+        }
+
+        String email = request.getEmail().trim().toLowerCase();
+        if (userRepository.findByEmail(email).isPresent()) {
+            throw new com.hostel.exception.DuplicateResourceException("User with email '" + email + "' already exists");
+        }
+
+        String rawPassword = (request.getPassword() != null && !request.getPassword().isBlank()) 
+                ? request.getPassword() : "Sec@1234";
+
+        User user = User.builder()
+                .email(email)
+                .passwordHash(passwordEncoder.encode(rawPassword))
+                .role(com.hostel.enums.Role.STUDENT)
+                .isActive(true)
+                .emailVerified(true)
+                .build();
+        user = userRepository.save(user);
+
+        StudentProfile profile = StudentProfile.builder()
+                .user(user)
+                .name(request.getName().trim())
+                .registerNumber(reg)
+                .department(request.getDepartment().trim())
+                .year(request.getYear())
+                .phone(request.getPhone().trim())
+                .gender(request.getGender())
+                .previousRoomNumber(request.getPreviousRoomNumber())
+                .allocationStatus(StudentAllocationStatus.NOT_APPLIED)
+                .build();
+        profile = studentProfileRepository.save(profile);
+
+        return StudentMapper.toResponse(profile, user);
+    }
+
+    @Transactional
+    public StudentResponse updateStudent(Long id, com.hostel.dto.request.AdminStudentCreateRequest request) {
+        StudentProfile profile = studentProfileRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("StudentProfile", "id", id));
+        User user = profile.getUser();
+
+        String reg = request.getRegisterNumber().trim().toUpperCase();
+        if (!profile.getRegisterNumber().equalsIgnoreCase(reg) && studentProfileRepository.existsByRegisterNumberIgnoreCase(reg)) {
+            throw new com.hostel.exception.DuplicateResourceException("Register number '" + reg + "' is already taken by another student");
+        }
+
+        String email = request.getEmail().trim().toLowerCase();
+        if (!user.getEmail().equalsIgnoreCase(email) && userRepository.findByEmail(email).isPresent()) {
+            throw new com.hostel.exception.DuplicateResourceException("Email '" + email + "' is already taken");
+        }
+
+        user.setEmail(email);
+        if (request.getPassword() != null && !request.getPassword().isBlank()) {
+            user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+        }
+        user = userRepository.save(user);
+
+        profile.setName(request.getName().trim());
+        profile.setRegisterNumber(reg);
+        profile.setDepartment(request.getDepartment().trim());
+        profile.setYear(request.getYear());
+        profile.setPhone(request.getPhone().trim());
+        profile.setGender(request.getGender());
+        profile.setPreviousRoomNumber(request.getPreviousRoomNumber());
+        profile = studentProfileRepository.save(profile);
+
+        return StudentMapper.toResponse(profile, user);
+    }
+
+    @Transactional
+    public void deleteStudent(Long id) {
+        StudentProfile profile = studentProfileRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("StudentProfile", "id", id));
+
+        List<RoomAllocation> allocations = roomAllocationRepository.findByStudentId(id);
+        if (!allocations.isEmpty()) {
+            throw new com.hostel.exception.BadRequestException("Cannot delete student with active room allocations.");
+        }
+
+        User user = profile.getUser();
+        studentProfileRepository.delete(profile);
+        if (user != null) {
+            userRepository.delete(user);
+        }
     }
 }

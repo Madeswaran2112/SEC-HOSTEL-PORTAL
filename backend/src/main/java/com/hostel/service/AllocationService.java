@@ -161,10 +161,14 @@ public class AllocationService {
         StudentProfile student = studentProfileRepository.findByUserId(user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("StudentProfile", "userId", user.getId()));
 
-        RoomAllocation allocation = allocationRepository.findByStudentIdAndAllocationWindowId(student.getId(), windowId)
-                .orElseThrow(() -> new ResourceNotFoundException("No allocation found for this window", "windowId", windowId));
+        java.util.Optional<RoomAllocation> allocationOpt;
+        if (windowId != null) {
+            allocationOpt = allocationRepository.findByStudentIdAndAllocationWindowId(student.getId(), windowId);
+        } else {
+            allocationOpt = allocationRepository.findFirstByStudentIdOrderByAllocatedAtDesc(student.getId());
+        }
                 
-        return AllocationMapper.toResponse(allocation);
+        return allocationOpt.map(AllocationMapper::toResponse).orElse(null);
     }
 
     @Transactional

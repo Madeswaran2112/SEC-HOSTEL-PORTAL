@@ -4,6 +4,7 @@ import { AuthProvider } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
 import { Toast } from './components/common/Toast';
 import { ProtectedRoute } from './components/common/ProtectedRoute';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { AuthLayout } from './components/layouts/AuthLayout';
 import { StudentLayout } from './components/layouts/StudentLayout';
 import { AdminLayout } from './components/layouts/AdminLayout';
@@ -15,6 +16,7 @@ import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 
 import StudentDashboard from './pages/student/StudentDashboard';
+import TwoPhaseBookingPage from './pages/student/TwoPhaseBookingPage';
 import StudentProfile from './pages/student/StudentProfile';
 import GroupManagement from './pages/student/GroupManagement';
 import CreateGroup from './pages/student/CreateGroup';
@@ -48,96 +50,101 @@ import SystemSettings from './pages/admin/SystemSettings';
 
 export const App: React.FC = () => {
   return (
-    <AuthProvider>
-      <NotificationProvider>
-        <BrowserRouter>
-          <Toast />
-          <Routes>
-            {/* Root Route -> SEC HOSTEL Unified Login Page */}
-            <Route path="/" element={<LoginPage />} />
-            <Route path="/login" element={<LoginPage />} />
+    <ErrorBoundary>
+      <AuthProvider>
+        <NotificationProvider>
+          <BrowserRouter>
+            <Toast />
+            <Routes>
+              {/* Root Route -> SEC HOSTEL Unified Login Page */}
+              <Route path="/" element={<LoginPage />} />
+              <Route path="/login" element={<LoginPage />} />
 
-            {/* Registration & Account Recovery */}
-            <Route element={<AuthLayout />}>
-              <Route path="/register" element={<RegisterPage />} />
-              <Route path="/verify-email" element={<VerifyEmailPage />} />
-              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-              <Route path="/reset-password" element={<ResetPasswordPage />} />
-            </Route>
-
-            {/* 1. BOYS PORTAL (Male Students Only) */}
-            <Route element={<ProtectedRoute allowedRoles={['ROLE_STUDENT', 'ROLE_BOYS_STUDENT']} allowedGender="MALE" />}>
-              <Route element={<StudentLayout />}>
-                <Route path="/boys" element={<StudentDashboard />} />
-                <Route path="/boys/dashboard" element={<Navigate to="/boys" replace />} />
-                <Route path="/boys/group" element={<GroupManagement />} />
-                <Route path="/boys/allocation" element={<AllocationStatus />} />
-                <Route path="/boys/waiting-pool" element={<WaitingPool />} />
+              {/* Registration & Account Recovery */}
+              <Route element={<AuthLayout />}>
+                <Route path="/register" element={<RegisterPage />} />
+                <Route path="/verify-email" element={<VerifyEmailPage />} />
+                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                <Route path="/reset-password" element={<ResetPasswordPage />} />
               </Route>
-            </Route>
 
-            {/* 2. GIRLS PORTAL (Female Students Only) */}
-            <Route element={<ProtectedRoute allowedRoles={['ROLE_STUDENT', 'ROLE_GIRLS_STUDENT']} allowedGender="FEMALE" />}>
-              <Route element={<StudentLayout />}>
-                <Route path="/girls" element={<StudentDashboard />} />
-                <Route path="/girls/dashboard" element={<Navigate to="/girls" replace />} />
-                <Route path="/girls/group" element={<GroupManagement />} />
-                <Route path="/girls/allocation" element={<AllocationStatus />} />
-                <Route path="/girls/waiting-pool" element={<WaitingPool />} />
+              {/* 1. BOYS PORTAL (Male Students Only) */}
+              <Route element={<ProtectedRoute allowedRoles={['ROLE_STUDENT', 'ROLE_BOYS_STUDENT']} allowedGender="MALE" />}>
+                <Route element={<StudentLayout />}>
+                  <Route path="/boys" element={<StudentDashboard />} />
+                  <Route path="/boys/dashboard" element={<Navigate to="/boys" replace />} />
+                  <Route path="/boys/booking" element={<TwoPhaseBookingPage />} />
+                  <Route path="/boys/group" element={<GroupManagement />} />
+                  <Route path="/boys/allocation" element={<AllocationStatus />} />
+                  <Route path="/boys/waiting-pool" element={<WaitingPool />} />
+                </Route>
               </Route>
-            </Route>
 
-            {/* Student General Subroutes */}
-            <Route element={<ProtectedRoute allowedRoles={['ROLE_STUDENT', 'ROLE_BOYS_STUDENT', 'ROLE_GIRLS_STUDENT']} />}>
-              <Route element={<StudentLayout />}>
-                <Route path="/student/dashboard" element={<StudentDashboard />} />
-                <Route path="/student/profile" element={<StudentProfile />} />
-                <Route path="/student/group" element={<GroupManagement />} />
-                <Route path="/student/group/create" element={<CreateGroup />} />
-                <Route path="/student/group/invitations" element={<GroupInvitations />} />
-                <Route path="/student/allocation" element={<AllocationStatus />} />
-                <Route path="/student/waiting-pool" element={<WaitingPool />} />
-                <Route path="/student/notifications" element={<NotificationCenter />} />
-                <Route path="/student" element={<Navigate to="/student/dashboard" replace />} />
+              {/* 2. GIRLS PORTAL (Female Students Only) */}
+              <Route element={<ProtectedRoute allowedRoles={['ROLE_STUDENT', 'ROLE_GIRLS_STUDENT']} allowedGender="FEMALE" />}>
+                <Route element={<StudentLayout />}>
+                  <Route path="/girls" element={<StudentDashboard />} />
+                  <Route path="/girls/dashboard" element={<Navigate to="/girls" replace />} />
+                  <Route path="/girls/booking" element={<TwoPhaseBookingPage />} />
+                  <Route path="/girls/group" element={<GroupManagement />} />
+                  <Route path="/girls/allocation" element={<AllocationStatus />} />
+                  <Route path="/girls/waiting-pool" element={<WaitingPool />} />
+                </Route>
               </Route>
-            </Route>
 
-            {/* 3. ADMIN PORTAL (Admin & Super Admin Only) */}
-            <Route element={<ProtectedRoute allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']} />}>
-              <Route element={<AdminLayout />}>
-                <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
-                <Route path="/admin/dashboard" element={<AdminDashboard />} />
-                <Route path="/admin/hostels" element={<HostelList />} />
-                <Route path="/admin/hostels/new" element={<HostelForm />} />
-                <Route path="/admin/hostels/:id" element={<HostelDetail />} />
-                <Route path="/admin/hostels/:id/edit" element={<HostelForm />} />
-                <Route path="/admin/room-types" element={<RoomTypeManagement />} />
-                <Route path="/admin/rooms" element={<RoomList />} />
-                <Route path="/admin/rooms/upload" element={<RoomUpload />} />
-                <Route path="/admin/rooms/new" element={<RoomForm />} />
-                <Route path="/admin/rooms/:id" element={<RoomDetail />} />
-                <Route path="/admin/rooms/:id/edit" element={<RoomForm />} />
-                <Route path="/admin/students" element={<StudentList />} />
-                <Route path="/admin/students/:id" element={<StudentDetail />} />
-                <Route path="/admin/groups" element={<GroupList />} />
-                <Route path="/admin/groups/:id" element={<GroupDetail />} />
-                <Route path="/admin/allocation-windows" element={<AllocationWindows />} />
-                <Route path="/admin/allocations" element={<AllocationManagement />} />
-                <Route path="/admin/allocations/run" element={<RunAllocation />} />
-                <Route path="/admin/allocations/manual" element={<ManualAllocation />} />
-                <Route path="/admin/allocations/final-list" element={<FinalAllocationList />} />
-                <Route path="/admin/waiting-pool" element={<WaitingPoolAdmin />} />
-                <Route path="/admin/export" element={<ExportCenter />} />
-                <Route path="/admin/audit-logs" element={<AuditLogs />} />
-                <Route path="/admin/settings" element={<SystemSettings />} />
+              {/* Student General Subroutes */}
+              <Route element={<ProtectedRoute allowedRoles={['ROLE_STUDENT', 'ROLE_BOYS_STUDENT', 'ROLE_GIRLS_STUDENT']} />}>
+                <Route element={<StudentLayout />}>
+                  <Route path="/student/dashboard" element={<StudentDashboard />} />
+                  <Route path="/student/booking" element={<TwoPhaseBookingPage />} />
+                  <Route path="/student/profile" element={<StudentProfile />} />
+                  <Route path="/student/group" element={<GroupManagement />} />
+                  <Route path="/student/group/create" element={<CreateGroup />} />
+                  <Route path="/student/group/invitations" element={<GroupInvitations />} />
+                  <Route path="/student/allocation" element={<AllocationStatus />} />
+                  <Route path="/student/waiting-pool" element={<WaitingPool />} />
+                  <Route path="/student/notifications" element={<NotificationCenter />} />
+                  <Route path="/student" element={<Navigate to="/student/dashboard" replace />} />
+                </Route>
               </Route>
-            </Route>
 
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </BrowserRouter>
-      </NotificationProvider>
-    </AuthProvider>
+              {/* 3. ADMIN PORTAL (Admin & Super Admin Only) */}
+              <Route element={<ProtectedRoute allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']} />}>
+                <Route element={<AdminLayout />}>
+                  <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+                  <Route path="/admin/dashboard" element={<AdminDashboard />} />
+                  <Route path="/admin/hostels" element={<HostelList />} />
+                  <Route path="/admin/hostels/new" element={<HostelForm />} />
+                  <Route path="/admin/hostels/:id" element={<HostelDetail />} />
+                  <Route path="/admin/hostels/:id/edit" element={<HostelForm />} />
+                  <Route path="/admin/room-types" element={<RoomTypeManagement />} />
+                  <Route path="/admin/rooms" element={<RoomList />} />
+                  <Route path="/admin/rooms/upload" element={<RoomUpload />} />
+                  <Route path="/admin/rooms/new" element={<RoomForm />} />
+                  <Route path="/admin/rooms/:id" element={<RoomDetail />} />
+                  <Route path="/admin/rooms/:id/edit" element={<RoomForm />} />
+                  <Route path="/admin/students" element={<StudentList />} />
+                  <Route path="/admin/students/:id" element={<StudentDetail />} />
+                  <Route path="/admin/groups" element={<GroupList />} />
+                  <Route path="/admin/groups/:id" element={<GroupDetail />} />
+                  <Route path="/admin/allocation-windows" element={<AllocationWindows />} />
+                  <Route path="/admin/allocations" element={<AllocationManagement />} />
+                  <Route path="/admin/allocations/run" element={<RunAllocation />} />
+                  <Route path="/admin/allocations/manual" element={<ManualAllocation />} />
+                  <Route path="/admin/allocations/final-list" element={<FinalAllocationList />} />
+                  <Route path="/admin/waiting-pool" element={<WaitingPoolAdmin />} />
+                  <Route path="/admin/export" element={<ExportCenter />} />
+                  <Route path="/admin/audit-logs" element={<AuditLogs />} />
+                  <Route path="/admin/settings" element={<SystemSettings />} />
+                </Route>
+              </Route>
+
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </BrowserRouter>
+        </NotificationProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 };
 

@@ -14,6 +14,8 @@ public interface RoomAllocationRepository extends JpaRepository<RoomAllocation, 
     List<RoomAllocation> findByRoomId(Long roomId);
     List<RoomAllocation> findByAllocationWindowId(Long windowId);
     Optional<RoomAllocation> findByStudentIdAndAllocationWindowId(Long studentId, Long windowId);
+    Optional<RoomAllocation> findFirstByStudentIdOrderByAllocatedAtDesc(Long studentId);
+    List<RoomAllocation> findByRoomIdAndAllocationWindowId(Long roomId, Long windowId);
     List<RoomAllocation> findByAllocationWindowIdAndStatus(Long windowId, AllocationStatus status);
     boolean existsByStudentIdAndAllocationWindowId(Long studentId, Long windowId);
     boolean existsByRoomIdAndBedNumberAndAllocationWindowId(Long roomId, Integer bedNumber, Long windowId);

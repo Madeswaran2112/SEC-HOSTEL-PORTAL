@@ -63,4 +63,22 @@ public class AllocationWindowController {
         AllocationWindowResponse response = windowService.changeStatus(id, status);
         return ResponseEntity.ok(ApiResponse.success("Window status updated successfully", response));
     }
+
+    @PatchMapping("/{id}/phase1-status")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<AllocationWindowResponse>> changePhase1Status(
+            @PathVariable Long id, 
+            @RequestParam com.hostel.enums.PhaseStatus status) {
+        AllocationWindowResponse response = windowService.changePhase1Status(id, status);
+        return ResponseEntity.ok(ApiResponse.success("Phase 1 status updated successfully", response));
+    }
+
+    @PatchMapping("/{id}/phase2-status")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<AllocationWindowResponse>> changePhase2Status(
+            @PathVariable Long id, 
+            @RequestParam com.hostel.enums.PhaseStatus status) {
+        AllocationWindowResponse response = windowService.changePhase2Status(id, status);
+        return ResponseEntity.ok(ApiResponse.success("Phase 2 status updated successfully", response));
+    }
 }

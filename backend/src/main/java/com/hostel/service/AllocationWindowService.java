@@ -94,6 +94,24 @@ public class AllocationWindowService {
         return mapToResponse(window);
     }
 
+    @Transactional
+    public AllocationWindowResponse changePhase1Status(Long id, com.hostel.enums.PhaseStatus status) {
+        AllocationWindow window = windowRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("AllocationWindow", "id", id));
+        window.setPhase1Status(status);
+        window = windowRepository.save(window);
+        return mapToResponse(window);
+    }
+
+    @Transactional
+    public AllocationWindowResponse changePhase2Status(Long id, com.hostel.enums.PhaseStatus status) {
+        AllocationWindow window = windowRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("AllocationWindow", "id", id));
+        window.setPhase2Status(status);
+        window = windowRepository.save(window);
+        return mapToResponse(window);
+    }
+
     private AllocationWindowResponse mapToResponse(AllocationWindow window) {
         return AllocationWindowResponse.builder()
                 .id(window.getId())
@@ -103,6 +121,8 @@ public class AllocationWindowService {
                 .startDate(window.getStartDate())
                 .endDate(window.getEndDate())
                 .status(window.getStatus())
+                .phase1Status(window.getPhase1Status() != null ? window.getPhase1Status() : com.hostel.enums.PhaseStatus.NOT_OPEN)
+                .phase2Status(window.getPhase2Status() != null ? window.getPhase2Status() : com.hostel.enums.PhaseStatus.NOT_OPEN)
                 .createdAt(window.getCreatedAt())
                 .build();
     }

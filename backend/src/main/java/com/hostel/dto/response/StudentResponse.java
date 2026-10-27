@@ -24,6 +24,7 @@ public class StudentResponse {
     private String phone;
     private Gender gender;
     private StudentAllocationStatus allocationStatus;
+    private String previousRoomNumber;
     private String role;
     private LocalDateTime createdAt;
 }

@@ -51,6 +51,9 @@ public class StudentProfile {
     @Builder.Default
     private StudentAllocationStatus allocationStatus = StudentAllocationStatus.NOT_APPLIED;
 
+    @Column(name = "previous_room_number")
+    private String previousRoomNumber;
+
     @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime createdAt;

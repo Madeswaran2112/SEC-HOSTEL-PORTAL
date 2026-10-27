@@ -109,14 +109,23 @@ public class RoomService {
         RoomType roomType = roomTypeRepository.findById(request.getRoomTypeId())
                 .orElseThrow(() -> new ResourceNotFoundException("RoomType", "id", request.getRoomTypeId()));
                 
-        if (roomType.getCapacity() < room.getOccupiedBeds()) {
-            throw new BadRequestException("New room type capacity (" + roomType.getCapacity() + ") is less than currently occupied beds (" + room.getOccupiedBeds() + ")");
+        int newCapacity = request.getTotalCapacity() != null && request.getTotalCapacity() > 0 
+                ? request.getTotalCapacity() : roomType.getCapacity();
+
+        if (newCapacity < room.getOccupiedBeds()) {
+            throw new BadRequestException("New capacity (" + newCapacity + ") is less than currently occupied beds (" + room.getOccupiedBeds() + ")");
         }
 
         room.setHostel(hostel);
         room.setRoomType(roomType);
         room.setRoomNumber(request.getRoomNumber());
+        if (request.getBuilding() != null && !request.getBuilding().isBlank()) {
+            room.setBuilding(request.getBuilding());
+        }
         room.setFloorNumber(request.getFloorNumber());
+        if (request.getTotalCapacity() != null && request.getTotalCapacity() > 0) {
+            room.setTotalCapacity(request.getTotalCapacity());
+        }
 
         room = roomRepository.save(room);
         return RoomMapper.toResponse(room);

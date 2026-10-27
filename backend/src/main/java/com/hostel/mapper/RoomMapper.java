@@ -13,8 +13,9 @@ public class RoomMapper {
             return null;
         }
 
-        Integer capacity = room.getRoomType() != null ? room.getRoomType().getCapacity() : 0;
-        Integer occupiedBeds = room.getOccupiedBeds() != null ? room.getOccupiedBeds() : 0;
+        int capacity = room.getEffectiveCapacity();
+        int occupiedBeds = room.getOccupiedBeds() != null ? room.getOccupiedBeds() : 0;
+        int availableBeds = room.getAvailableBeds();
 
         return RoomResponse.builder()
                 .id(room.getId())
@@ -22,12 +23,15 @@ public class RoomMapper {
                 .hostelName(room.getHostel() != null ? room.getHostel().getName() : null)
                 .roomTypeId(room.getRoomType() != null ? room.getRoomType().getId() : null)
                 .roomTypeName(room.getRoomType() != null ? room.getRoomType().getName() : null)
+                .isAc(room.getRoomType() != null ? room.getRoomType().getIsAc() : false)
+                .building(room.getBuilding() != null ? room.getBuilding() : "Main Block")
                 .roomNumber(room.getRoomNumber())
                 .floorNumber(room.getFloorNumber())
                 .status(room.getStatus())
                 .capacity(capacity)
+                .totalCapacity(room.getTotalCapacity() != null ? room.getTotalCapacity() : capacity)
                 .occupiedBeds(occupiedBeds)
-                .availableBeds(capacity - occupiedBeds)
+                .availableBeds(availableBeds)
                 .build();
     }
 
@@ -40,7 +44,9 @@ public class RoomMapper {
                 .hostel(hostel)
                 .roomType(roomType)
                 .roomNumber(request.getRoomNumber())
+                .building(request.getBuilding() != null ? request.getBuilding() : "Main Block")
                 .floorNumber(request.getFloorNumber())
+                .totalCapacity(request.getTotalCapacity() != null && request.getTotalCapacity() > 0 ? request.getTotalCapacity() : roomType.getCapacity())
                 .build();
     }
 }

@@ -7,7 +7,7 @@ import { Modal } from '../../components/common/Modal';
 import { FormField } from '../../components/common/FormField';
 import { usePagination } from '../../hooks/usePagination';
 import { formatDate } from '../../utils/formatters';
-import { Calendar, Plus, Play, CheckCircle, Lock } from 'lucide-react';
+import { Calendar, Plus, Play, CheckCircle, Lock, Layers } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export const AllocationWindows: React.FC = () => {
@@ -74,13 +74,33 @@ export const AllocationWindows: React.FC = () => {
     }
   };
 
-  const handleStatusChange = async (id: string, newStatus: string) => {
+  const handleStatusChange = async (id: string | number, newStatus: string) => {
     try {
       await windowApi.updateStatus(id, newStatus);
       toast.success(`Window status updated to ${newStatus}`);
       fetchWindows();
     } catch {
       toast.error('Failed to update window status');
+    }
+  };
+
+  const handlePhase1StatusChange = async (id: string | number, newStatus: string) => {
+    try {
+      await windowApi.updatePhase1Status(id, newStatus);
+      toast.success(`Phase 1 status updated to ${newStatus}`);
+      fetchWindows();
+    } catch {
+      toast.error('Failed to update Phase 1 status');
+    }
+  };
+
+  const handlePhase2StatusChange = async (id: string | number, newStatus: string) => {
+    try {
+      await windowApi.updatePhase2Status(id, newStatus);
+      toast.success(`Phase 2 status updated to ${newStatus}`);
+      fetchWindows();
+    } catch {
+      toast.error('Failed to update Phase 2 status');
     }
   };
 
@@ -106,8 +126,60 @@ export const AllocationWindows: React.FC = () => {
     },
     {
       key: 'status',
-      header: 'Status',
+      header: 'Window Status',
       render: (w: AllocationWindow) => <StatusBadge status={String(w.status)} />
+    },
+    {
+      key: 'phase1Status',
+      header: 'Phase 1: Room Preference',
+      render: (w: AllocationWindow) => (
+        <div className="flex items-center gap-1.5">
+          <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+            w.phase1Status === 'OPEN'
+              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+              : w.phase1Status === 'CLOSED'
+              ? 'bg-rose-100 text-rose-800 border border-rose-300'
+              : 'bg-gray-100 text-gray-700 border border-gray-300'
+          }`}>
+            {w.phase1Status || 'NOT_OPEN'}
+          </span>
+          <select
+            value={w.phase1Status || 'NOT_OPEN'}
+            onChange={(e) => handlePhase1StatusChange(w.id, e.target.value)}
+            className="text-[11px] font-semibold border rounded-lg px-1.5 py-0.5 bg-white text-gray-700 focus:outline-none"
+          >
+            <option value="NOT_OPEN">NOT_OPEN</option>
+            <option value="OPEN">OPEN</option>
+            <option value="CLOSED">CLOSED</option>
+          </select>
+        </div>
+      )
+    },
+    {
+      key: 'phase2Status',
+      header: 'Phase 2: Room Selection',
+      render: (w: AllocationWindow) => (
+        <div className="flex items-center gap-1.5">
+          <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+            w.phase2Status === 'OPEN'
+              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+              : w.phase2Status === 'CLOSED'
+              ? 'bg-rose-100 text-rose-800 border border-rose-300'
+              : 'bg-gray-100 text-gray-700 border border-gray-300'
+          }`}>
+            {w.phase2Status || 'NOT_OPEN'}
+          </span>
+          <select
+            value={w.phase2Status || 'NOT_OPEN'}
+            onChange={(e) => handlePhase2StatusChange(w.id, e.target.value)}
+            className="text-[11px] font-semibold border rounded-lg px-1.5 py-0.5 bg-white text-gray-700 focus:outline-none"
+          >
+            <option value="NOT_OPEN">NOT_OPEN</option>
+            <option value="OPEN">OPEN</option>
+            <option value="CLOSED">CLOSED</option>
+          </select>
+        </div>
+      )
     },
     {
       key: 'actions',
@@ -149,10 +221,10 @@ export const AllocationWindows: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
             <Calendar className="h-6 w-6 text-indigo-600" />
-            Allocation Windows
+            Allocation Windows & Phase Controls
           </h1>
           <p className="mt-1 text-sm text-gray-500">
-            Define academic cycles and timeline windows for student hostel group registrations and room allocations.
+            Define academic cycles and manage independent Phase 1 (Room Preference) & Phase 2 (Room Selection) controls.
           </p>
         </div>
 
@@ -179,56 +251,67 @@ export const AllocationWindows: React.FC = () => {
       <Modal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
-        title="Create Allocation Window"
-        size="lg"
+        title="Create New Allocation Window"
       >
         <form onSubmit={handleCreate} className="space-y-4">
-          <FormField
-            label="Window Title / Name"
-            name="name"
-            placeholder="e.g. 2026-27 Odd Semester Allocation"
-            required
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          />
+          <FormField label="Window Name" required>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              placeholder="e.g. 2026-2027 Odd Semester Allocation"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              required
+            />
+          </FormField>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <FormField
-              label="Academic Year"
-              name="academicYear"
-              required
-              value={formData.academicYear}
-              onChange={(e) => setFormData({ ...formData, academicYear: e.target.value })}
-            />
-            <FormField
-              label="Semester"
-              name="semester"
-              required
-              value={formData.semester}
-              onChange={(e) => setFormData({ ...formData, semester: e.target.value })}
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Academic Year" required>
+              <input
+                type="text"
+                value={formData.academicYear}
+                onChange={(e) => setFormData({ ...formData, academicYear: e.target.value })}
+                placeholder="2026-2027"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                required
+              />
+            </FormField>
+
+            <FormField label="Semester" required>
+              <select
+                value={formData.semester}
+                onChange={(e) => setFormData({ ...formData, semester: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              >
+                <option value="Odd Semester">Odd Semester</option>
+                <option value="Even Semester">Even Semester</option>
+              </select>
+            </FormField>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <FormField
-              label="Start Date"
-              type="date"
-              name="startDate"
-              required
-              value={formData.startDate}
-              onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-            />
-            <FormField
-              label="End Date"
-              type="date"
-              name="endDate"
-              required
-              value={formData.endDate}
-              onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Start Date" required>
+              <input
+                type="datetime-local"
+                value={formData.startDate}
+                onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                required
+              />
+            </FormField>
+
+            <FormField label="End Date" required>
+              <input
+                type="datetime-local"
+                value={formData.endDate}
+                onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                required
+              />
+            </FormField>
           </div>
 
-          <div className="pt-4 flex justify-end space-x-3 border-t">
+          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
             <button
               type="button"
               onClick={() => setModalOpen(false)}
@@ -239,7 +322,7 @@ export const AllocationWindows: React.FC = () => {
             <button
               type="submit"
               disabled={submitting}
-              className="px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
+              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
             >
               {submitting ? 'Creating...' : 'Create Window'}
             </button>

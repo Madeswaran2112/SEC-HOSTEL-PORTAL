@@ -1,6 +1,7 @@
 package com.hostel.dto.response;
 
 import com.hostel.enums.AllocationWindowStatus;
+import com.hostel.enums.PhaseStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -20,5 +21,7 @@ public class AllocationWindowResponse {
     private LocalDateTime startDate;
     private LocalDateTime endDate;
     private AllocationWindowStatus status;
+    private PhaseStatus phase1Status;
+    private PhaseStatus phase2Status;
     private LocalDateTime createdAt;
 }

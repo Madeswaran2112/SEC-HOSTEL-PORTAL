@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Building2, LogOut, User as UserIcon } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
@@ -17,9 +17,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
     navigate('/');
   };
 
-  const isStudent = user?.role === 'ROLE_STUDENT';
+  const isStudent = user?.role === 'ROLE_STUDENT' || user?.role === 'ROLE_BOYS_STUDENT' || user?.role === 'ROLE_GIRLS_STUDENT';
   const isAdmin = user?.role === 'ROLE_ADMIN' || user?.role === 'ROLE_SUPER_ADMIN';
-  const studentHome = user?.gender === 'FEMALE' ? '/girls' : '/boys';
+  const studentHome = (user?.role === 'ROLE_GIRLS_STUDENT' || user?.gender === 'FEMALE') ? '/girls' : '/boys';
 
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
@@ -52,6 +52,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
             {isStudent && (
               <nav className="hidden md:ml-8 md:flex md:space-x-4">
                 <Link to={studentHome} className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-50">Dashboard</Link>
+                <Link to={`${studentHome}/booking`} className="px-3 py-2 rounded-md text-sm font-semibold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50">Room Booking</Link>
                 <Link to={`${studentHome}/group`} className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-50">My Group</Link>
                 <Link to={`${studentHome}/allocation`} className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-50">Room Allocation</Link>
                 <Link to={`${studentHome}/waiting-pool`} className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-50">Waiting Pool</Link>

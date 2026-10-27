@@ -37,6 +37,9 @@ public class Room {
     @Column(name = "room_number", nullable = false)
     private String roomNumber;
 
+    @Column(name = "building")
+    private String building;
+
     @Column(nullable = false)
     private Integer floorNumber;
 
@@ -44,6 +47,9 @@ public class Room {
     @Column(nullable = false)
     @Builder.Default
     private RoomStatus status = RoomStatus.AVAILABLE;
+
+    @Column(name = "total_capacity")
+    private Integer totalCapacity;
 
     @Column(nullable = false)
     @Builder.Default
@@ -55,4 +61,17 @@ public class Room {
 
     @UpdateTimestamp
     private LocalDateTime updatedAt;
+
+    public int getEffectiveCapacity() {
+        if (totalCapacity != null && totalCapacity > 0) {
+            return totalCapacity;
+        }
+        return roomType != null && roomType.getCapacity() != null ? roomType.getCapacity() : 0;
+    }
+
+    public int getAvailableBeds() {
+        int cap = getEffectiveCapacity();
+        int occ = occupiedBeds != null ? occupiedBeds : 0;
+        return Math.max(0, cap - occ);
+    }
 }

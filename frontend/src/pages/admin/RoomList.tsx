@@ -6,7 +6,7 @@ import { Room } from '../../types/room';
 import { DataTable } from '../../components/common/DataTable';
 import { SearchFilter } from '../../components/common/SearchFilter';
 import { StatusBadge } from '../../components/common/StatusBadge';
-import { Plus, Edit, Trash2 } from 'lucide-react';
+import { Plus, Edit, Trash2, Home } from 'lucide-react';
 import usePagination from '../../hooks/usePagination';
 import toast from 'react-hot-toast';
 import { SelectOption } from '../../types/common';
@@ -70,32 +70,57 @@ export const RoomList: React.FC = () => {
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    if (!window.confirm('Are you sure you want to delete this room?')) return;
+    if (!window.confirm('Are you sure you want to delete this room? It will be rejected if students are already allocated.')) return;
     try {
       await roomApi.delete(id);
       toast.success('Room deleted');
       fetchRooms();
-    } catch (error) {
-      toast.error('Failed to delete room');
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to delete room (Room has allocations or dependencies)');
     }
   };
 
   const columns = [
-    { key: 'roomNumber', header: 'Room No', render: (r: Room) => <span className="font-bold text-gray-900">{r.roomNumber}</span> },
+    { key: 'roomNumber', header: 'Room No', render: (r: Room) => <span className="font-bold text-gray-900 font-mono">{r.roomNumber}</span> },
     { key: 'hostelName', header: 'Hostel' },
-    { key: 'floorNumber', header: 'Floor' },
-    { key: 'roomTypeName', header: 'Type' },
-    { key: 'occupancy', header: 'Occupancy', render: (r: Room) => `${r.occupiedBeds} / ${r.capacity}` },
+    { key: 'building', header: 'Building', render: (r: Room) => <span className="text-xs text-gray-700">{r.building || 'Main'}</span> },
+    { key: 'floorNumber', header: 'Floor', render: (r: Room) => `Floor ${r.floorNumber}` },
+    {
+      key: 'roomTypeName',
+      header: 'Type & AC',
+      render: (r: Room) => (
+        <span className="text-xs font-medium">
+          {r.roomTypeName}{' '}
+          {r.isAc ? (
+            <span className="ml-1 text-sky-700 font-bold bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200">AC</span>
+          ) : (
+            <span className="ml-1 text-gray-500 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-200">Non-AC</span>
+          )}
+        </span>
+      )
+    },
+    {
+      key: 'occupancy',
+      header: 'Beds (Avail / Usable)',
+      render: (r: Room) => (
+        <div className="text-xs font-semibold">
+          <span className="text-emerald-700 font-bold">{r.availableBeds ?? (r.capacity - r.occupiedBeds)}</span>
+          <span className="text-gray-400"> / </span>
+          <span>{r.totalCapacity ?? r.capacity} usable</span>
+          <div className="text-[10px] text-gray-500 font-normal">({r.occupiedBeds} occupied)</div>
+        </div>
+      )
+    },
     { key: 'status', header: 'Status', render: (r: Room) => <StatusBadge status={r.status} /> },
     {
       key: 'actions',
       header: 'Actions',
       render: (r: Room) => (
         <div className="flex space-x-2">
-          <button onClick={(e) => { e.stopPropagation(); navigate(`/admin/rooms/${r.id}/edit`); }} className="text-indigo-600 hover:text-indigo-900">
+          <button onClick={(e) => { e.stopPropagation(); navigate(`/admin/rooms/${r.id}/edit`); }} className="text-indigo-600 hover:text-indigo-900" title="Edit Room">
             <Edit className="h-4 w-4" />
           </button>
-          <button onClick={(e) => handleDelete(e, r.id)} className="text-red-600 hover:text-red-900">
+          <button onClick={(e) => handleDelete(e, r.id)} className="text-red-600 hover:text-red-900" title="Delete Room">
             <Trash2 className="h-4 w-4" />
           </button>
         </div>
@@ -106,7 +131,15 @@ export const RoomList: React.FC = () => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">Rooms</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <Home className="h-6 w-6 text-indigo-600" />
+            Hostel Rooms Inventory
+          </h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Manage room capacities, buildings, floors, AC configurations, and real-time bed availabilities.
+          </p>
+        </div>
         <button
           onClick={() => navigate('/admin/rooms/new')}
           className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
@@ -124,6 +157,7 @@ export const RoomList: React.FC = () => {
           { key: 'roomTypeId', label: 'Room Type', options: roomTypes },
           { key: 'status', label: 'Status', options: [
             { label: 'Available', value: 'AVAILABLE' },
+            { label: 'Occupied', value: 'OCCUPIED' },
             { label: 'Full', value: 'FULL' },
             { label: 'Maintenance', value: 'MAINTENANCE' },
             { label: 'Blocked', value: 'BLOCKED' }

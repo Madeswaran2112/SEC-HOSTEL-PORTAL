@@ -5,14 +5,15 @@ export enum Gender {
 
 export enum StudentAllocationStatus {
   NOT_APPLIED = 'NOT_APPLIED',
+  APPLIED = 'APPLIED',
   IN_POOL = 'IN_POOL',
   ALLOCATED = 'ALLOCATED',
   CONFIRMED = 'CONFIRMED'
 }
 
 export interface Student {
-  id: string;
-  userId: string;
+  id: string | number;
+  userId: string | number;
   name: string;
   registerNumber: string;
   department: string;
@@ -21,6 +22,8 @@ export interface Student {
   phone: string;
   gender: Gender | string;
   allocationStatus: StudentAllocationStatus | string;
+  previousRoomNumber?: string;
+  role?: string;
   createdAt: string;
 }
 
@@ -29,5 +32,25 @@ export interface StudentUpdateRequest {
   department?: string;
   year?: number;
   phone?: string;
+  previousRoomNumber?: string;
 }
 
+export interface AdminStudentCreateRequest {
+  name: string;
+  registerNumber: string;
+  email: string;
+  department: string;
+  year: number;
+  phone: string;
+  gender: Gender | string;
+  previousRoomNumber?: string;
+  password?: string;
+}
+
+export interface StudentImportResponse {
+  totalRows: number;
+  importedCount: number;
+  errorCount: number;
+  message: string;
+  errors: string[];
+}

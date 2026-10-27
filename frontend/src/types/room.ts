@@ -18,21 +18,26 @@ export interface Room {
   id: string;
   hostelId: string;
   hostelName?: string;
-  roomTypeId: string;
+  roomTypeId: string | number;
   roomTypeName?: string;
+  isAc?: boolean;
+  building?: string;
   roomNumber: string;
   floorNumber: number;
   status: RoomStatus | string;
   capacity: number;
+  totalCapacity?: number;
   occupiedBeds: number;
   availableBeds: number;
 }
 
 export interface RoomRequest {
-  hostelId: string;
-  roomTypeId: string;
+  hostelId: string | number;
+  roomTypeId: string | number;
   roomNumber: string;
+  building?: string;
   floorNumber: number;
+  totalCapacity?: number;
 }
 
 export interface RoomTypeRequest {

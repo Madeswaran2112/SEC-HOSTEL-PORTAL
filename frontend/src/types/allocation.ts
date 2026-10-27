@@ -1,3 +1,5 @@
+export type PhaseStatus = 'NOT_OPEN' | 'OPEN' | 'CLOSED';
+
 export interface Allocation {
   id: string;
   studentId: string;
@@ -13,8 +15,8 @@ export interface Allocation {
   allocationType: AllocationType;
   groupId?: string;
   groupName?: string;
-  allocatedAt: string;
-  respondedAt?: string;
+  allocatedAt: any;
+  respondedAt?: any;
 }
 
 export interface AllocationWindow {
@@ -25,6 +27,8 @@ export interface AllocationWindow {
   startDate: string;
   endDate: string;
   status: AllocationWindowStatus;
+  phase1Status?: PhaseStatus;
+  phase2Status?: PhaseStatus;
   createdAt: string;
 }
 
@@ -58,6 +62,68 @@ export interface WaitingPoolJoinRequest {
   preferredRoomTypeId?: string;
 }
 
+export interface PhaseOnePreferenceRequest {
+  preferredRoomTypeId: number;
+  isAc: boolean;
+}
+
+export interface PhaseOnePreferenceResponse {
+  id: number;
+  studentId: number;
+  studentName: string;
+  registerNumber: string;
+  allocationWindowId: number;
+  windowName: string;
+  preferredRoomTypeId: number;
+  preferredRoomTypeName: string;
+  capacity: number;
+  isAc: boolean;
+  submittedAt: string;
+  updatedAt?: string;
+}
+
+export interface ValidateRoommateResponse {
+  valid: boolean;
+  studentId?: number;
+  name?: string;
+  registerNumber?: string;
+  department?: string;
+  year?: number;
+  gender?: string;
+  message: string;
+}
+
+export interface PhaseTwoBookingRequest {
+  roomId: number;
+  roommateRegisterNumbers: string[];
+}
+
+export interface PhaseTwoBookingResponse {
+  roomId: number;
+  roomNumber: string;
+  building: string;
+  hostelName: string;
+  floorNumber: number;
+  roomTypeName: string;
+  isAc: boolean;
+  totalCapacity: number;
+  occupiedBeds: number;
+  availableBeds: number;
+  allocations: Allocation[];
+  bookedAt: string;
+}
+
+export interface BookingStatusResponse {
+  window: AllocationWindow | null;
+  phase1Status: PhaseStatus;
+  phase2Status: PhaseStatus;
+  hasSubmittedPhase1: boolean;
+  phase1Preference: PhaseOnePreferenceResponse | null;
+  hasBookedPhase2: boolean;
+  allocation: Allocation | null;
+  roommates: Allocation[];
+}
+
 export enum AllocationStatus {
   PENDING = 'PENDING',
   ACCEPTED = 'ACCEPTED',
@@ -77,4 +143,3 @@ export enum AllocationWindowStatus {
   ALLOCATION_RUNNING = 'ALLOCATION_RUNNING',
   COMPLETED = 'COMPLETED'
 }
-

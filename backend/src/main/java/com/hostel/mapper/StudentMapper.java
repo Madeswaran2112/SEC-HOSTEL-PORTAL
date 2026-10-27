@@ -41,6 +41,7 @@ public class StudentMapper {
                 .phone(studentProfile.getPhone())
                 .gender(studentProfile.getGender())
                 .allocationStatus(studentProfile.getAllocationStatus())
+                .previousRoomNumber(studentProfile.getPreviousRoomNumber())
                 .role(roleStr)
                 .createdAt(studentProfile.getCreatedAt())
                 .build();

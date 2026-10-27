@@ -55,7 +55,7 @@ public class AllocationController {
 
     @GetMapping("/my-allocation")
     public ResponseEntity<ApiResponse<AllocationResponse>> getMyAllocation(
-            @RequestParam Long windowId, 
+            @RequestParam(required = false) Long windowId, 
             @CurrentUser UserDetails userDetails) {
         AllocationResponse response = allocationService.getMyAllocation(windowId, userDetails);
         return ResponseEntity.ok(ApiResponse.success("Allocation retrieved successfully", response));

@@ -16,10 +16,13 @@ public class RoomResponse {
     private String hostelName;
     private Long roomTypeId;
     private String roomTypeName;
+    private Boolean isAc;
+    private String building;
     private String roomNumber;
     private Integer floorNumber;
     private RoomStatus status;
     private Integer capacity;
+    private Integer totalCapacity;
     private Integer occupiedBeds;
     private Integer availableBeds;
 }

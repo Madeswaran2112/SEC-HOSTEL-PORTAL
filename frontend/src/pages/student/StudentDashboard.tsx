@@ -1,12 +1,12 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import useAuth from '../../hooks/useAuth';
 import { studentApi } from '../../api/studentApi';
 import { groupApi } from '../../api/groupApi';
-import { allocationApi } from '../../api/allocationApi';
+import { allocationApi, bookingApi } from '../../api/allocationApi';
 import { Student } from '../../types/student';
 import { Group } from '../../types/group';
-import { Allocation } from '../../types/allocation';
+import { Allocation, BookingStatusResponse } from '../../types/allocation';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import {
   User,
@@ -16,7 +16,9 @@ import {
   Clock,
   Bell,
   Sparkles,
-  Bed
+  Bed,
+  ArrowRight,
+  ShieldCheck
 } from 'lucide-react';
 import useNotifications from '../../hooks/useNotifications';
 
@@ -28,15 +30,17 @@ export const StudentDashboard: React.FC = () => {
   const [student, setStudent] = useState<Student | null>(null);
   const [group, setGroup] = useState<Group | null>(null);
   const [allocation, setAllocation] = useState<Allocation | null>(null);
+  const [bookingStatus, setBookingStatus] = useState<BookingStatusResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const [studentRes, groupRes, allocationRes] = await Promise.allSettled([
+        const [studentRes, groupRes, allocationRes, bookingRes] = await Promise.allSettled([
           studentApi.getProfile(),
           groupApi.getMyGroup(),
-          allocationApi.getMyAllocation()
+          allocationApi.getMyAllocation(),
+          bookingApi.getStatus()
         ]);
 
         if (studentRes.status === 'fulfilled' && studentRes.value?.data) {
@@ -47,6 +51,12 @@ export const StudentDashboard: React.FC = () => {
         }
         if (allocationRes.status === 'fulfilled' && allocationRes.value?.data) {
           setAllocation(allocationRes.value.data);
+        }
+        if (bookingRes.status === 'fulfilled' && bookingRes.value?.data) {
+          setBookingStatus(bookingRes.value.data);
+          if (bookingRes.value.data.allocation) {
+            setAllocation(bookingRes.value.data.allocation);
+          }
         }
       } catch (error) {
         console.error('Failed to load student dashboard data', error);
@@ -125,6 +135,61 @@ export const StudentDashboard: React.FC = () => {
               </span>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* 8-Stage Student Workflow Tracker */}
+      <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-gray-100">
+          <div>
+            <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-indigo-600" />
+              <span>Room Allocation Progress (8-Stage Workflow)</span>
+            </h2>
+            <p className="text-xs text-gray-500">Live progress of your SEC Hostel room booking journey</p>
+          </div>
+          <Link
+            to={isGirls ? '/girls/booking' : '/boys/booking'}
+            className={`inline-flex items-center gap-1.5 py-2 px-4 rounded-xl text-xs font-bold text-white transition shadow-xs ${theme.primaryBg}`}
+          >
+            Go to Room Booking <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+
+        {/* Stages Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2 pt-2">
+          {[
+            { num: 1, label: 'Window Open', isDone: true, isCurrent: !bookingStatus?.hasSubmittedPhase1 },
+            { num: 2, label: 'Phase 1 Preference', isDone: Boolean(bookingStatus?.hasSubmittedPhase1), isCurrent: Boolean(bookingStatus?.hasSubmittedPhase1 && bookingStatus?.phase2Status !== 'OPEN') },
+            { num: 3, label: 'Phase 2 Wait', isDone: bookingStatus?.phase2Status === 'OPEN' || Boolean(allocation), isCurrent: bookingStatus?.hasSubmittedPhase1 && bookingStatus?.phase2Status !== 'OPEN' },
+            { num: 4, label: 'Select Room', isDone: Boolean(allocation), isCurrent: bookingStatus?.phase2Status === 'OPEN' && !allocation },
+            { num: 5, label: 'Add Roommates', isDone: Boolean(allocation), isCurrent: bookingStatus?.phase2Status === 'OPEN' && !allocation },
+            { num: 6, label: 'Confirm Booking', isDone: Boolean(allocation), isCurrent: bookingStatus?.phase2Status === 'OPEN' && !allocation },
+            { num: 7, label: 'Room Assigned', isDone: Boolean(allocation), isCurrent: Boolean(allocation) },
+            { num: 8, label: 'Room Details', isDone: Boolean(allocation), isCurrent: Boolean(allocation) },
+          ].map((s) => (
+            <div
+              key={s.num}
+              className={`p-2.5 rounded-xl border text-center transition ${
+                s.isDone
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                  : s.isCurrent
+                  ? 'bg-blue-50 border-blue-300 text-blue-900 ring-2 ring-blue-500/20'
+                  : 'bg-gray-50 border-gray-100 text-gray-400'
+              }`}
+            >
+              <div className="flex items-center justify-center mb-1">
+                <span
+                  className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black ${
+                    s.isDone ? 'bg-emerald-600 text-white' : s.isCurrent ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'
+                  }`}
+                >
+                  {s.isDone ? '✓' : s.num}
+                </span>
+              </div>
+              <span className="text-[11px] font-bold leading-tight block">{s.label}</span>
+            </div>
+          ))}
         </div>
       </div>
 

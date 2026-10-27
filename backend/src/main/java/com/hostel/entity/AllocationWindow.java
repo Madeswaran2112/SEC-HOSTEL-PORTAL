@@ -1,6 +1,7 @@
 package com.hostel.entity;
 
 import com.hostel.enums.AllocationWindowStatus;
+import com.hostel.enums.PhaseStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -38,6 +39,16 @@ public class AllocationWindow {
     @Column(nullable = false)
     @Builder.Default
     private AllocationWindowStatus status = AllocationWindowStatus.UPCOMING;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    private PhaseStatus phase1Status = PhaseStatus.NOT_OPEN;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    private PhaseStatus phase2Status = PhaseStatus.NOT_OPEN;
 
     @CreationTimestamp
     @Column(updatable = false)

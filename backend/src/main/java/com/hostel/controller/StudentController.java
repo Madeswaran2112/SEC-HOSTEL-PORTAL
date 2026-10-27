@@ -25,6 +25,7 @@ import java.util.Map;
 public class StudentController {
 
     private final StudentService studentService;
+    private final com.hostel.service.StudentExcelService studentExcelService;
 
     @GetMapping({"/me", "/profile"})
     public ResponseEntity<ApiResponse<StudentResponse>> getCurrentStudentProfile(@CurrentUser UserDetails userDetails) {
@@ -76,5 +77,47 @@ public class StudentController {
     public ResponseEntity<ApiResponse<Map<String, Object>>> getStudentStats() {
         Map<String, Object> stats = studentService.getStudentStats();
         return ResponseEntity.ok(ApiResponse.success("Student stats retrieved successfully", stats));
+    }
+
+    @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<StudentResponse>> createStudent(
+            @Valid @RequestBody com.hostel.dto.request.AdminStudentCreateRequest request) {
+        StudentResponse response = studentService.createStudent(request);
+        return new ResponseEntity<>(ApiResponse.success("Student created successfully", response), org.springframework.http.HttpStatus.CREATED);
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<StudentResponse>> updateStudent(
+            @PathVariable Long id,
+            @Valid @RequestBody com.hostel.dto.request.AdminStudentCreateRequest request) {
+        StudentResponse response = studentService.updateStudent(id, request);
+        return ResponseEntity.ok(ApiResponse.success("Student updated successfully", response));
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> deleteStudent(@PathVariable Long id) {
+        studentService.deleteStudent(id);
+        return ResponseEntity.ok(ApiResponse.success("Student deleted successfully", null));
+    }
+
+    @GetMapping("/template/excel")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public ResponseEntity<byte[]> downloadStudentsTemplate() {
+        byte[] excelBytes = studentExcelService.generateTemplateExcel();
+        return ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"students_template.xlsx\"")
+                .contentType(org.springframework.http.MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(excelBytes);
+    }
+
+    @PostMapping(value = "/import/excel", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<com.hostel.dto.response.StudentImportResponse>> importStudentsExcel(
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        com.hostel.dto.response.StudentImportResponse response = studentExcelService.importStudentsFromExcel(file);
+        return ResponseEntity.ok(ApiResponse.success("Students Excel processed successfully", response));
     }
 }
