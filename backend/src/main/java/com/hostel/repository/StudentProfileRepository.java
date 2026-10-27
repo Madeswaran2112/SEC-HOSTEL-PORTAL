@@ -14,8 +14,10 @@ import java.util.Optional;
 public interface StudentProfileRepository extends JpaRepository<StudentProfile, Long> {
     Optional<StudentProfile> findByUserId(Long userId);
     Optional<StudentProfile> findByRegisterNumber(String registerNumber);
+    Optional<StudentProfile> findByRegisterNumberIgnoreCase(String registerNumber);
     List<StudentProfile> findByGender(Gender gender);
     boolean existsByRegisterNumber(String registerNumber);
+    boolean existsByRegisterNumberIgnoreCase(String registerNumber);
 
     @Query("SELECT s FROM StudentProfile s WHERE LOWER(s.name) LIKE LOWER(CONCAT('%', :query, '%')) OR LOWER(s.registerNumber) LIKE LOWER(CONCAT('%', :query, '%'))")
     List<StudentProfile> searchByNameOrRegisterNumber(@Param("query") String query);

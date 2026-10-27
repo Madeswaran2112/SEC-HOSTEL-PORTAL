@@ -36,7 +36,8 @@ public class HostelApplication {
             AllocationWindowRepository windowRepository) {
         return args -> {
             // Seed Admin Users
-            if (!userRepository.existsByEmail("admin@hostel.com")) {
+            java.util.Optional<User> existingAdmin = userRepository.findByEmailIgnoreCase("admin@hostel.com");
+            if (existingAdmin.isEmpty()) {
                 userRepository.save(User.builder()
                         .email("admin@hostel.com")
                         .passwordHash(passwordEncoder.encode("Admin@123"))
@@ -44,8 +45,18 @@ public class HostelApplication {
                         .isActive(true)
                         .emailVerified(true)
                         .build());
+            } else {
+                User admin = existingAdmin.get();
+                if (!Boolean.TRUE.equals(admin.getIsActive()) || admin.getRole() != Role.ADMIN) {
+                    admin.setIsActive(true);
+                    admin.setRole(Role.ADMIN);
+                    admin.setEmailVerified(true);
+                    userRepository.save(admin);
+                }
             }
-            if (!userRepository.existsByEmail("superadmin@hostel.com")) {
+
+            java.util.Optional<User> existingSuperAdmin = userRepository.findByEmailIgnoreCase("superadmin@hostel.com");
+            if (existingSuperAdmin.isEmpty()) {
                 userRepository.save(User.builder()
                         .email("superadmin@hostel.com")
                         .passwordHash(passwordEncoder.encode("SuperAdmin@123"))
@@ -53,6 +64,14 @@ public class HostelApplication {
                         .isActive(true)
                         .emailVerified(true)
                         .build());
+            } else {
+                User superAdmin = existingSuperAdmin.get();
+                if (!Boolean.TRUE.equals(superAdmin.getIsActive()) || superAdmin.getRole() != Role.SUPER_ADMIN) {
+                    superAdmin.setIsActive(true);
+                    superAdmin.setRole(Role.SUPER_ADMIN);
+                    superAdmin.setEmailVerified(true);
+                    userRepository.save(superAdmin);
+                }
             }
 
             // Seed Hostels (Boys Hostel & Girls Hostel)

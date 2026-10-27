@@ -23,6 +23,13 @@ public class StudentMapper {
                     .build();
         }
         
+        String roleStr = user.getRole() != null ? "ROLE_" + user.getRole().name() : "ROLE_STUDENT";
+        if (studentProfile.getGender() == com.hostel.enums.Gender.MALE) {
+            roleStr = "ROLE_BOYS_STUDENT";
+        } else if (studentProfile.getGender() == com.hostel.enums.Gender.FEMALE) {
+            roleStr = "ROLE_GIRLS_STUDENT";
+        }
+
         return StudentResponse.builder()
                 .id(studentProfile.getId())
                 .userId(user.getId())
@@ -34,7 +41,7 @@ public class StudentMapper {
                 .phone(studentProfile.getPhone())
                 .gender(studentProfile.getGender())
                 .allocationStatus(studentProfile.getAllocationStatus())
-                .role(user.getRole() != null ? "ROLE_" + user.getRole().name() : "ROLE_STUDENT")
+                .role(roleStr)
                 .createdAt(studentProfile.getCreatedAt())
                 .build();
     }

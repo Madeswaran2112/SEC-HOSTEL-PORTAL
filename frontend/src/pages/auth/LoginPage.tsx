@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import useAuth from '../../hooks/useAuth';
 import campusBg from '../../assets/sec-hostel-login-bg.png';
@@ -37,9 +37,9 @@ export const LoginPage: React.FC = () => {
 
       if (user?.role === 'ROLE_ADMIN' || user?.role === 'ROLE_SUPER_ADMIN') {
         navigate('/admin');
-      } else if (user?.gender === 'FEMALE') {
+      } else if (user?.role === 'ROLE_GIRLS_STUDENT' || user?.gender === 'FEMALE') {
         navigate('/girls');
-      } else if (user?.gender === 'MALE') {
+      } else if (user?.role === 'ROLE_BOYS_STUDENT' || user?.gender === 'MALE') {
         navigate('/boys');
       } else {
         navigate('/boys');

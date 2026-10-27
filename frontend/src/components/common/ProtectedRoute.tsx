@@ -27,7 +27,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles, al
 
   // 1. Role Authorization Check
   if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
-    if (user.role === 'ROLE_STUDENT') {
+    const isStudent = user.role === 'ROLE_STUDENT' || user.role === 'ROLE_BOYS_STUDENT' || user.role === 'ROLE_GIRLS_STUDENT';
+    if (isStudent) {
       return <Navigate to={user.gender === 'FEMALE' ? '/girls' : '/boys'} replace />;
     } else {
       return <Navigate to="/admin" replace />;
@@ -36,7 +37,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles, al
 
   // 2. Strict Gender Separation Security
   if (allowedGender) {
-    if (user.role !== 'ROLE_STUDENT') {
+    const isStudent = user.role === 'ROLE_STUDENT' || user.role === 'ROLE_BOYS_STUDENT' || user.role === 'ROLE_GIRLS_STUDENT';
+    if (!isStudent) {
       return <Navigate to="/admin" replace />;
     }
     if (user.gender && user.gender !== allowedGender) {

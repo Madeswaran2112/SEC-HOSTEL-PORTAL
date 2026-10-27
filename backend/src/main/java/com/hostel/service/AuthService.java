@@ -80,27 +80,51 @@ public class AuthService {
     }
 
     public AuthResponse login(LoginRequest request) {
-        String identifier = request.getEmail().trim();
-        if (!identifier.contains("@")) {
-            StudentProfile profile = studentProfileRepository.findByRegisterNumber(identifier)
-                    .orElseThrow(() -> new UnauthorizedException("Invalid credentials"));
-            identifier = profile.getUser().getEmail();
-        }
+        String identifier = request.getEmail() != null ? request.getEmail().trim() : "";
+        User user = resolveUser(identifier)
+                .orElseThrow(() -> new UnauthorizedException("Invalid credentials"));
 
         Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(identifier, request.getPassword())
+                new UsernamePasswordAuthenticationToken(user.getEmail(), request.getPassword())
         );
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
-
-        User user = userRepository.findByEmail(identifier)
-                .orElseThrow(() -> new UnauthorizedException("Invalid credentials"));
 
         if (!user.getIsActive()) {
             throw new UnauthorizedException("Account is disabled");
         }
 
         return generateAuthResponse(user, user.getStudentProfile());
+    }
+
+    private java.util.Optional<User> resolveUser(String identifier) {
+        if (identifier == null || identifier.isBlank()) {
+            return java.util.Optional.empty();
+        }
+
+        java.util.Optional<User> byEmail = userRepository.findByEmailIgnoreCase(identifier);
+        if (byEmail.isPresent()) {
+            return byEmail;
+        }
+
+        java.util.Optional<User> byRegNo = studentProfileRepository.findByRegisterNumberIgnoreCase(identifier)
+                .map(com.hostel.entity.StudentProfile::getUser);
+        if (byRegNo.isPresent()) {
+            return byRegNo;
+        }
+
+        if (!identifier.contains("@")) {
+            java.util.Optional<User> byHostelDomain = userRepository.findByEmailIgnoreCase(identifier + "@hostel.com");
+            if (byHostelDomain.isPresent()) {
+                return byHostelDomain;
+            }
+            java.util.Optional<User> byPrefix = userRepository.findByEmailStartingWithIgnoreCase(identifier + "@");
+            if (byPrefix.isPresent()) {
+                return byPrefix;
+            }
+        }
+
+        return java.util.Optional.empty();
     }
 
     public AuthResponse refreshToken(String refreshToken) {

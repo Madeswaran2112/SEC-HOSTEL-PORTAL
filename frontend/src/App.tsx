@@ -66,7 +66,7 @@ export const App: React.FC = () => {
             </Route>
 
             {/* 1. BOYS PORTAL (Male Students Only) */}
-            <Route element={<ProtectedRoute allowedRoles={['ROLE_STUDENT']} allowedGender="MALE" />}>
+            <Route element={<ProtectedRoute allowedRoles={['ROLE_STUDENT', 'ROLE_BOYS_STUDENT']} allowedGender="MALE" />}>
               <Route element={<StudentLayout />}>
                 <Route path="/boys" element={<StudentDashboard />} />
                 <Route path="/boys/dashboard" element={<Navigate to="/boys" replace />} />
@@ -77,7 +77,7 @@ export const App: React.FC = () => {
             </Route>
 
             {/* 2. GIRLS PORTAL (Female Students Only) */}
-            <Route element={<ProtectedRoute allowedRoles={['ROLE_STUDENT']} allowedGender="FEMALE" />}>
+            <Route element={<ProtectedRoute allowedRoles={['ROLE_STUDENT', 'ROLE_GIRLS_STUDENT']} allowedGender="FEMALE" />}>
               <Route element={<StudentLayout />}>
                 <Route path="/girls" element={<StudentDashboard />} />
                 <Route path="/girls/dashboard" element={<Navigate to="/girls" replace />} />
@@ -88,7 +88,7 @@ export const App: React.FC = () => {
             </Route>
 
             {/* Student General Subroutes */}
-            <Route element={<ProtectedRoute allowedRoles={['ROLE_STUDENT']} />}>
+            <Route element={<ProtectedRoute allowedRoles={['ROLE_STUDENT', 'ROLE_BOYS_STUDENT', 'ROLE_GIRLS_STUDENT']} />}>
               <Route element={<StudentLayout />}>
                 <Route path="/student/dashboard" element={<StudentDashboard />} />
                 <Route path="/student/profile" element={<StudentProfile />} />
